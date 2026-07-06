@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<title>LCR 比較儀表板 · 本國銀行流動性覆蓋比率</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
+<style>
+  :root{
+    --bg:#f6f7fa; --panel:#ffffff; --panel2:#f3f5f9; --line:#e2e6ee;
+    --ink:#1f2430; --sub:#657081; --accent:#4f46e5; --gold:#a16207;
+    --gov:#2563eb; --priv:#7c3aed; --foreign:#0d9488; --virtual:#d97706;
+    --red:#dc2626;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:"Noto Sans TC",-apple-system,"PingFang TC",sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;}
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 20px 60px;}
+  header h1{font-size:22px;letter-spacing:1px;}
+  header .sub{color:var(--sub);font-size:13px;margin-top:4px;}
+  .tabs{display:flex;gap:8px;margin:18px 0 14px;flex-wrap:wrap;}
+  .tab{padding:8px 16px;border-radius:999px;border:1px solid var(--line);background:var(--panel);
+    color:var(--sub);cursor:pointer;font-size:13.5px;}
+  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;
+    box-shadow:0 1px 3px rgba(30,41,59,.06);}
+  .panel h2{font-size:15.5px;margin-bottom:4px;}
+  .panel .hint{color:var(--sub);font-size:12.5px;margin-bottom:12px;}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  .chip{padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--sub);cursor:pointer;font-size:12.5px;user-select:none;}
+  .chip.on{color:#fff;border-color:var(--accent);background:var(--accent);}
+  .chip.gov.on{background:var(--gov);border-color:var(--gov);}
+  .chip.priv.on{background:var(--priv);border-color:var(--priv);}
+  .chip.foreign.on{background:var(--foreign);border-color:var(--foreign);color:#fff;}
+  .chip.virtual.on{background:var(--virtual);border-color:var(--virtual);color:#fff;}
+  .bank-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:5px;max-height:170px;
+    overflow-y:auto;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--panel2);}
+  .bank-grid label{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--sub);cursor:pointer;white-space:nowrap;}
+  .bank-grid input{accent-color:var(--accent);}
+  .chart-box{position:relative;height:420px;margin-top:8px;}
+  .chart-box.tall{height:560px;}
+  .chart-box.xtall{height:840px;}
+  select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:8px;
+    padding:6px 10px;font-size:13.5px;font-family:inherit;}
+  .stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:12px 0;}
+  .scard{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;}
+  .scard .k{font-size:11.5px;color:var(--sub);}
+  .scard .v{font-size:20px;font-weight:700;margin-top:2px;}
+  .scard .v.red{color:var(--red);} .scard .v.gold{color:var(--gold);}
+  table{width:100%;border-collapse:collapse;font-size:12.8px;}
+  th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;}
+  th{color:var(--sub);font-weight:600;cursor:pointer;position:sticky;top:0;background:var(--panel);}
+  th:first-child,td:first-child{text-align:left;}
+  tr:hover td{background:rgba(79,70,229,.05);}
+  .tag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;margin-left:6px;}
+  .tag.gov{background:rgba(37,99,235,.10);color:var(--gov);}
+  .tag.priv{background:rgba(124,58,237,.10);color:var(--priv);}
+  .tag.foreign{background:rgba(13,148,136,.10);color:var(--foreign);}
+  .tag.virtual{background:rgba(217,119,6,.12);color:var(--virtual);}
+  .flag{font-size:12px;} .flag.r{color:var(--red);font-weight:700;} .flag.y{color:var(--gold);}
+  .table-scroll{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:10px;}
+  .note{color:var(--sub);font-size:12px;margin-top:10px;line-height:1.7;}
+  section{display:none;} section.show{display:block;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>📊 LCR 比較儀表板 <span style="color:var(--sub);font-weight:400;font-size:14px;">本國銀行流動性覆蓋比率</span></h1>
+  <div class="sub">資料期間 2020Q1–2026Q1 · 來源：中央銀行「本國銀行營運績效季報 — 主要財務及營運比率」 · 法定最低標準 100% · 單位 %</div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" data-sec="trend">📈 趨勢比較</button>
+  <button class="tab" data-sec="rank">🏁 單季排行</button>
+  <button class="tab" data-sec="bank">🔍 單行檢視</button>
+  <button class="tab" data-sec="group">🧩 分組走勢</button>
+  <button class="tab" data-sec="table">⚠️ 預警與總表</button>
+</div>
+
+<section id="sec-trend" class="show">
+  <div class="panel">
+    <h2>多行走勢疊圖（不同銀行跨期比較）</h2>
+    <div class="hint">勾選要比較的銀行；線色＝各行企業識別色（近似）；灰虛線＝全體平均，紅色水平線＝法定下限 100%。
+      　區間：<select id="range-from"></select> ～ <select id="range-to"></select></div>
+    <div class="chips" id="quick-chips">
+      <span class="chip" data-q="big5">五大民營</span>
+      <span class="chip gov" data-q="gov">公股/泛公股</span>
+      <span class="chip priv" data-q="priv">民營</span>
+      <span class="chip foreign" data-q="foreign">外銀子行</span>
+      <span class="chip virtual" data-q="virtual">純網銀</span>
+      <span class="chip" data-q="none">清空</span>
+    </div>
+    <div class="bank-grid" id="bank-checks"></div>
+    <div class="chart-box"><canvas id="trend-chart"></canvas></div>
+  </div>
+</section>
+
+<section id="sec-rank">
+  <div class="panel">
+    <h2>單季排行（同一季不同銀行比較）</h2>
+    <div class="hint">季度：<select id="rank-q"></select>　顏色＝各行企業識別色（近似）；滑鼠停留顯示分組；紅線＝100%。</div>
+    <div class="chart-box xtall"><canvas id="rank-chart"></canvas></div>
+  </div>
+</section>
+
+<section id="sec-bank">
+  <div class="panel">
+    <h2>單行檢視（同家銀行跨期比較）</h2>
+    <div class="hint">銀行：<select id="bank-sel"></select>
+      　區間：<select id="bank-range-from"></select> ～ <select id="bank-range-to"></select></div>
+    <div class="stat-cards" id="bank-stats"></div>
+    <div class="chart-box"><canvas id="bank-chart"></canvas></div>
+  </div>
+</section>
+
+<section id="sec-group">
+  <div class="panel">
+    <h2>分組走勢（組內中位數）</h2>
+    <div class="hint">各組取<b>中位數</b>而非平均——民營組的簡單平均會被小型行極端值拉高（例：三信曾 >500%、京城 >350%），中位數才代表組內典型水準。
+      灰虛線＝央行公佈之全體平均（加權口徑：全體 HQLA÷全體淨流出，非簡單平均）。<br>
+      <label style="cursor:pointer;"><input type="checkbox" id="show-virtual" style="accent-color:var(--accent);"> 顯示純網銀（開業初期 LCR 達數千～上萬 %，勾選後改用對數軸）</label></div>
+    <div class="chart-box"><canvas id="group-chart"></canvas></div>
+  </div>
+</section>
+
+<section id="sec-table">
+  <div class="panel">
+    <h2>預警與資料總表</h2>
+    <div class="hint">依「距 100% 緩衝」由小到大排序；🔴＝最新 &lt;115% 且連兩季下滑、🟡＝&lt;115% 或連三季下滑。點欄位標題可重新排序。</div>
+    <div class="table-scroll"><table id="main-table"><thead></thead><tbody></tbody></table></div>
+    <div class="note">空值＝該期不適用或未營業（輸出入銀行不適用 LCR；純網銀 2021 起陸續開業；日盛國際 2023 併入台北富邦後序列中止）。<br>
+    資料處理：`~/Downloads/LCR/`（lcr_update.py 抽取央行季報 → 本頁靜態內嵌）。每季更新照 分析計劃書-20260706.md §5。</div>
+  </div>
+</section>
+
+</div>
+<script>
+const D = {"quarters":["2020Q1","2020Q2","2020Q3","2020Q4","2021Q1","2021Q2","2021Q3","2021Q4","2022Q1","2022Q2","2022Q3","2022Q4","2023Q1","2023Q2","2023Q3","2023Q4","2024Q1","2024Q2","2024Q3","2024Q4","2025Q1","2025Q2","2025Q3","2025Q4","2026Q1"],"banks":[{"n":"臺灣銀行","g":"公股/泛公股","v":[184.52,177.45,160.63,176.1,171.9,152.67,152.03,190.75,146.66,132.49,129.07,124.08,149.83,132.33,152.61,128.32,135.1,119.7,147.61,125.04,119.43,114.0,138.4,130.86,105.34]},{"n":"土地銀行","g":"公股/泛公股","v":[103.07,92.98,93.44,97.78,101.73,101.87,101.5,104.01,110.97,107.67,103.61,103.74,111.49,108.49,121.61,113.87,115.76,111.65,103.2,106.76,110.22,112.73,110.7,110.06,102.3]},{"n":"合作金庫","g":"公股/泛公股","v":[122.01,117.03,123.16,118.81,151.07,134.71,138.5,130.74,145.07,129.31,136.02,130.61,131.17,125.6,124.53,120.24,132.92,118.57,113.3,118.02,127.9,120.82,119.03,128.58,114.72]},{"n":"第一銀行","g":"公股/泛公股","v":[133.59,117.96,112.89,123.71,132.55,136.51,124.44,127.33,131.39,132.87,119.15,116.07,123.81,121.5,127.6,126.86,129.14,125.34,114.88,113.82,119.44,119.27,122.05,120.47,109.67]},{"n":"華南銀行","g":"公股/泛公股","v":[115.55,121.45,113.11,116.89,153.5,128.21,130.53,123.72,125.08,116.44,112.12,140.4,139.28,136.1,125.3,122.82,118.44,119.58,121.69,119.11,127.52,118.49,124.57,121.66,113.64]},{"n":"彰化銀行","g":"公股/泛公股","v":[125.42,114.86,139.76,137.68,129.35,149.97,135.64,127.49,153.22,130.12,123.79,122.64,135.96,145.67,148.71,122.54,115.61,116.85,117.32,122.99,135.13,128.88,130.92,122.87,118.33]},{"n":"上海銀行","g":"民營","v":[119.35,115.73,121.72,120.49,123.28,121.44,126.61,113.34,114.42,110.24,103.8,115.73,124.68,126.0,120.25,118.5,131.48,126.03,123.94,118.12,148.18,139.41,133.08,136.11,128.35]},{"n":"台北富邦","g":"民營","v":[134.73,118.65,114.22,121.25,122.29,118.12,112.68,118.5,109.84,110.55,117.51,112.45,137.78,121.33,118.9,119.6,126.62,121.75,120.74,120.16,139.12,125.93,128.66,118.7,115.8]},{"n":"國泰世華","g":"民營","v":[168.48,185.54,187.39,194.52,172.98,180.47,166.5,177.91,187.89,201.52,170.7,166.7,163.03,146.52,149.62,137.99,145.22,123.46,117.52,106.86,120.08,121.5,142.55,134.38,126.85]},{"n":"中國輸出","g":"公股/泛公股","v":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]},{"n":"高雄銀行","g":"公股/泛公股","v":[184.92,123.57,133.53,126.16,163.6,121.42,136.27,137.49,159.95,184.55,128.65,110.79,131.53,121.01,116.23,124.99,135.15,162.16,123.55,126.32,141.33,126.03,132.21,156.71,132.01]},{"n":"兆豐銀行","g":"公股/泛公股","v":[111.66,111.65,111.89,110.57,119.03,116.24,119.73,112.97,111.76,120.75,113.26,119.28,116.67,118.74,121.78,118.09,133.41,115.38,114.44,114.12,119.88,114.7,126.22,125.81,114.83]},{"n":"全國農業","g":"公股/泛公股","v":[106.99,102.53,130.61,117.41,118.26,124.13,147.49,126.99,143.13,140.45,137.15,103.16,117.39,117.38,135.51,112.39,114.32,102.85,114.34,108.77,114.11,100.79,100.64,102.21,102.35]},{"n":"花旗(台","g":"外銀子行","v":[148.48,155.05,142.82,159.16,138.58,132.43,126.69,138.03,161.13,177.69,168.53,176.71,199.92,203.92,298.08,249.57,246.82,250.6,210.89,257.38,222.63,156.82,285.71,244.79,166.18]},{"n":"王道銀行","g":"民營","v":[104.02,100.27,102.41,105.93,113.01,118.95,118.95,117.02,113.22,113.81,110.84,110.63,114.23,111.74,111.31,105.25,117.73,119.16,111.65,108.03,125.83,116.23,117.16,124.87,118.48]},{"n":"臺灣中小","g":"公股/泛公股","v":[133.46,117.02,112.26,121.42,132.37,124.19,115.16,132.11,123.88,125.05,null,109.73,118.86,124.26,126.52,132.4,120.81,112.6,111.76,118.23,112.47,112.58,120.16,110.99,110.41]},{"n":"渣打國際","g":"外銀子行","v":[187.59,178.93,185.2,153.89,162.66,180.96,174.98,166.94,187.61,182.94,166.65,188.44,160.66,197.78,186.94,185.2,216.88,184.36,169.89,255.99,155.83,181.49,180.5,156.5,177.87]},{"n":"台中銀行","g":"民營","v":[155.76,165.26,160.26,148.83,167.53,158.43,169.45,154.56,171.66,168.48,145.48,141.53,137.93,145.58,136.36,129.89,138.22,141.68,122.04,127.7,118.89,123.37,130.15,131.1,119.22]},{"n":"京城銀行","g":"民營","v":[182.76,161.89,145.05,145.72,141.8,147.96,142.16,154.62,140.78,124.6,105.39,110.04,114.07,117.22,132.34,172.95,215.11,229.76,204.45,242.63,177.17,350.85,354.41,303.27,355.73]},{"n":"滙豐(台","g":"外銀子行","v":[154.2,150.44,169.74,142.65,172.69,141.6,139.54,146.18,148.44,142.68,131.59,136.25,191.83,173.28,133.79,162.57,168.04,170.2,178.77,135.96,173.4,199.63,198.81,197.08,185.3]},{"n":"瑞興銀行","g":"民營","v":[146.5,130.34,125.82,126.35,145.25,145.63,127.89,111.66,151.06,110.7,117.86,110.52,134.41,113.88,105.6,107.49,140.52,136.57,118.76,114.92,123.27,126.23,129.86,132.15,121.93]},{"n":"華泰銀行","g":"民營","v":[211.83,230.1,268.67,298.15,270.12,200.15,200.87,142.17,128.8,115.68,124.21,111.2,116.13,114.41,146.13,135.24,148.22,132.97,113.73,119.95,132.37,111.75,127.74,141.35,156.28]},{"n":"臺灣新光","g":"民營","v":[147.16,157.24,127.53,135.46,154.66,151.33,138.92,132.81,149.39,146.3,120.86,117.18,159.99,150.96,166.4,128.42,147.89,159.26,141.71,121.95,134.72,138.81,136.98,126.14,124.74]},{"n":"陽信銀行","g":"民營","v":[120.18,107.64,108.94,103.33,111.86,109.27,114.04,108.74,114.34,114.53,112.67,101.04,115.79,117.03,121.31,114.09,114.58,117.97,115.7,113.64,121.31,119.86,120.59,125.81,115.52]},{"n":"板信銀行","g":"民營","v":[156.24,148.61,139.14,126.97,117.54,115.79,113.25,105.4,116.38,110.05,113.79,105.63,130.02,118.09,112.06,106.75,114.86,114.54,113.67,110.12,127.12,109.75,125.63,119.75,116.66]},{"n":"三信銀行","g":"民營","v":[435.09,492.95,397.92,575.3,503.45,449.74,263.83,441.25,526.85,465.91,234.14,209.22,193.29,201.54,223.9,269.95,331.32,248.32,207.55,164.53,156.77,177.75,192.32,193.76,200.91]},{"n":"聯邦銀行","g":"民營","v":[158.85,152.7,187.55,177.88,214.29,165.23,206.59,170.38,170.97,131.95,105.07,105.74,147.97,151.23,120.41,118.02,125.27,132.67,118.39,123.21,134.29,138.32,132.78,123.36,117.62]},{"n":"遠東銀行","g":"民營","v":[124.91,118.99,123.59,124.71,142.42,136.89,128.51,125.5,142.22,133.54,135.99,114.63,112.03,114.81,128.28,125.63,125.61,127.29,131.62,132.26,122.25,117.25,124.81,123.34,114.24]},{"n":"元大銀行","g":"民營","v":[200.03,196.88,208.22,200.87,237.56,223.53,231.04,192.49,187.19,198.46,171.15,164.23,158.58,192.63,184.79,171.41,169.76,170.83,165.73,138.16,133.17,128.24,136.91,127.61,123.21]},{"n":"永豐銀行","g":"民營","v":[161.12,123.55,129.2,134.95,143.65,156.86,149.28,125.2,136.85,124.1,130.12,138.62,124.47,132.23,139.77,133.91,128.04,125.92,132.1,127.41,132.73,138.3,137.04,137.48,120.93]},{"n":"玉山銀行","g":"民營","v":[125.06,135.45,117.63,129.67,133.83,125.25,126.36,119.25,124.72,120.14,111.14,124.33,132.63,141.29,140.13,142.2,143.59,128.09,117.71,121.15,121.67,119.58,115.13,132.6,123.91]},{"n":"凱基銀行","g":"民營","v":[111.19,106.41,107.32,110.19,112.28,111.14,112.4,110.48,110.77,106.61,101.38,103.35,122.07,123.23,125.76,109.76,107.1,114.82,108.06,119.34,109.1,113.26,118.27,119.54,126.61]},{"n":"星展(台","g":"外銀子行","v":[127.45,114.55,121.11,122.77,122.9,125.55,118.96,119.82,119.36,119.93,129.25,138.8,139.58,141.58,151.1,138.74,169.57,165.16,145.2,140.67,153.52,132.11,136.6,182.16,127.74]},{"n":"台新國際","g":"民營","v":[111.29,115.94,123.85,124.71,120.3,128.45,116.33,112.02,112.92,118.76,115.83,115.57,127.85,145.35,129.64,118.74,119.33,116.12,111.83,116.21,118.24,121.65,116.3,114.97,111.74]},{"n":"安泰銀行","g":"民營","v":[132.73,204.95,249.23,267.06,153.95,127.33,145.42,110.4,122.4,135.27,113.01,114.99,132.2,125.13,125.19,131.67,133.94,140.15,147.56,146.66,160.5,165.57,119.6,133.21,133.08]},{"n":"中國信託","g":"民營","v":[128.71,137.35,139.2,123.57,151.51,152.27,148.87,143.4,158.25,152.65,156.36,138.3,130.11,157.27,127.71,136.8,129.16,136.1,123.92,121.94,115.36,115.57,118.23,112.03,110.97]},{"n":"將來商業","g":"純網銀","v":[null,126.16,135.11,146.55,null,null,null,null,null,17979.17,5714.29,3491.49,4311.33,3648.22,4236.31,2770.01,2323.49,1470.85,1070.38,449.38,249.04,188.03,218.42,242.97,207.81]},{"n":"連線銀行","g":"純網銀","v":[null,null,null,null,null,null,7309.3,2373.48,9387.24,9179.3,8375.75,8570.45,6743.31,6259.86,4488.22,2399.23,3005.3,1995.9,1895.0,569.45,1289.26,912.49,785.73,null,667.16]},{"n":"樂天銀行","g":"純網銀","v":[null,null,null,null,null,6558.14,9048.82,13739.39,9424.87,7799.66,3073.4,3467.69,3411.39,1872.16,1827.62,1219.7,1165.08,792.84,384.88,362.44,275.27,181.32,209.12,164.01,142.66]},{"n":"日盛國際","g":"民營","v":[null,null,null,null,null,356.49,528.25,338.29,null,178.88,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]}],"avg":[139.68,133.51,134.15,132.64,142.49,138.11,139.47,132.51,139.12,137.38,126.92,124.07,137.46,134.38,134.66,129.13,139.08,136.61,127.9,124.77,133.27,126.43,129.15,134.08,122.91]};
+const GCOLOR = {'公股/泛公股':'#2563eb','民營':'#7c3aed','外銀子行':'#0d9488','純網銀':'#d97706'};
+const GCLS = {'公股/泛公股':'gov','民營':'priv','外銀子行':'foreign','純網銀':'virtual'};
+const BIG5 = ['中國信託','國泰世華','兆豐銀行','玉山銀行','台北富邦'];
+const PALETTE = ['#4f46e5','#b45309','#0d9488','#db2777','#2563eb','#ea580c','#16a34a','#9333ea','#0891b2','#dc2626','#65a30d','#475569'];
+const strokeCollator = new Intl.Collator('zh', {collation:'stroke'});
+// 各行企業識別色（近似值：取自各行 logo／招牌主色印象，同色系銀行以深淺區分；未確認者以分組色系近似）
+const BANK_COLOR = {
+  '臺灣銀行':'#1a5ca8','土地銀行':'#1e8a4c','合作金庫':'#0e6fb5','第一銀行':'#0c7a3e',
+  '華南銀行':'#c8102e','彰化銀行':'#b5342a','兆豐銀行':'#8e1537','臺灣中小':'#d2691e',
+  '高雄銀行':'#2e6fa3','全國農業':'#4a7c2f','中國輸出':'#6b7280',
+  '上海銀行':'#144a8f','台北富邦':'#0053a0','國泰世華':'#00873e','王道銀行':'#f08300',
+  '台中銀行':'#a02040','京城銀行':'#c9a227','瑞興銀行':'#7a4a2b','華泰銀行':'#8d4b9e',
+  '臺灣新光':'#e5007e','陽信銀行':'#f39c12','板信銀行':'#3f6fb0','三信銀行':'#c0392b',
+  '聯邦銀行':'#28559a','遠東銀行':'#2f7d5a','元大銀行':'#d92626','永豐銀行':'#57a639',
+  '玉山銀行':'#00654f','凱基銀行':'#e03a3e','台新國際':'#e60039','安泰銀行':'#e8792a',
+  '中國信託':'#00533f','日盛國際':'#d94f2b',
+  '花旗(台':'#056dae','渣打國際':'#00a546','滙豐(台':'#db0011','星展(台':'#e4002b',
+  '將來商業':'#5b4de0','連線銀行':'#06c755','樂天銀行':'#bf0000'
+};
+function bcolor(n, i){ return BANK_COLOR[n] || PALETTE[(i||0) % PALETTE.length]; }
+function rgba(hex, a){ const h = hex.replace('#',''); return `rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${a})`; }
+Chart.defaults.color = '#5b6472';
+Chart.defaults.borderColor = '#e6e9f0';
+Chart.defaults.font.family = '"Noto Sans TC",-apple-system,sans-serif';
+
+const line100 = {id:'line100', afterDraw(c){
+  const y = c.scales.y, x = c.scales.x; if(!y||!x) return;
+  const ctx = c.ctx; let px, horizontal = c.config.options.indexAxis === 'y';
+  ctx.save(); ctx.strokeStyle = 'rgba(220,38,38,.7)'; ctx.setLineDash([5,4]); ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  if(horizontal){ px = x.getPixelForValue(100); ctx.moveTo(px, y.top); ctx.lineTo(px, y.bottom); }
+  else { px = y.getPixelForValue(100); ctx.moveTo(x.left, px); ctx.lineTo(x.right, px); }
+  ctx.stroke(); ctx.restore();
+}};
+
+function bankObj(n){ return D.banks.find(b => b.n === n); }
+function lastIdx(v){ for(let i=v.length-1;i>=0;i--) if(v[i]!=null) return i; return -1; }
+
+// ---------- tab 切換 ----------
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x===t));
+  document.querySelectorAll('section').forEach(s => s.classList.toggle('show', s.id === 'sec-'+t.dataset.sec));
+}));
+
+// ---------- 1 趨勢比較 ----------
+const checksBox = document.getElementById('bank-checks');
+D.banks.forEach(b => {
+  const l = document.createElement('label');
+  l.innerHTML = `<input type="checkbox" value="${b.n}"> ${b.n}`;
+  checksBox.appendChild(l);
+});
+let trendChart;
+function selectedBanks(){ return [...checksBox.querySelectorAll('input:checked')].map(i => i.value); }
+// 區間選單
+const rangeFrom = document.getElementById('range-from');
+const rangeTo = document.getElementById('range-to');
+D.quarters.forEach(q => { rangeFrom.add(new Option(q, q)); rangeTo.add(new Option(q, q)); });
+rangeFrom.value = D.quarters[0];
+rangeTo.value = D.quarters[D.quarters.length - 1];
+function rangeIdx(){
+  let a = D.quarters.indexOf(rangeFrom.value), b = D.quarters.indexOf(rangeTo.value);
+  if(a > b){ [a, b] = [b, a]; }
+  return [a, b];
+}
+function drawTrend(){
+  const sel = selectedBanks();
+  const [a, b] = rangeIdx();
+  const labels = D.quarters.slice(a, b + 1);
+  const ds = sel.map((n,i) => ({label:n, data:bankObj(n).v.slice(a, b + 1), borderColor:bcolor(n, i),
+    backgroundColor:bcolor(n, i), spanGaps:true, pointRadius:2, borderWidth:2, tension:.25}));
+  ds.push({label:'全體平均', data:D.avg.slice(a, b + 1), borderColor:'#334155', borderDash:[6,4], pointRadius:0, borderWidth:1.6, tension:.25});
+  if(trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById('trend-chart'), {type:'line',
+    data:{labels, datasets:ds},
+    options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'nearest', intersect:false},
+      plugins:{legend:{position:'bottom'}}, scales:{y:{title:{display:true,text:'LCR %'}}}},
+    plugins:[line100]});
+}
+rangeFrom.addEventListener('change', drawTrend);
+rangeTo.addEventListener('change', drawTrend);
+checksBox.addEventListener('change', drawTrend);
+document.getElementById('quick-chips').addEventListener('click', e => {
+  const q = e.target.dataset.q; if(!q) return;
+  e.target.classList.toggle('on');
+  const boxes = [...checksBox.querySelectorAll('input')];
+  if(q === 'none'){ boxes.forEach(b => b.checked = false); document.querySelectorAll('#quick-chips .chip').forEach(c=>c.classList.remove('on')); }
+  else if(q === 'big5'){ const on = e.target.classList.contains('on'); boxes.forEach(b => { if(BIG5.includes(b.value)) b.checked = on; }); }
+  else { const g = {gov:'公股/泛公股', priv:'民營', foreign:'外銀子行', virtual:'純網銀'}[q];
+         const on = e.target.classList.contains('on');
+         boxes.forEach(b => { if(bankObj(b.value).g === g) b.checked = on; }); }
+  drawTrend();
+});
+[...checksBox.querySelectorAll('input')].forEach(b => { if(BIG5.includes(b.value)) b.checked = true; });
+drawTrend();
+
+// ---------- 2 單季排行 ----------
+const rankSel = document.getElementById('rank-q');
+D.quarters.slice().reverse().forEach(q => rankSel.add(new Option(q, q)));
+const RANK_EXCLUDE = ['連線銀行', '京城銀行']; // 數值遠超其他行（純網銀初期特例／小型行極端值），排除以免壓縮其餘長條比例
+const GROUP_ORDER = ['公股/泛公股','民營','外銀子行','純網銀'];
+const RANK_PIN = '中國信託'; // 固定顯示在最上方
+const RANK_GRAY_LO = [216,219,226]; // 數值最小＝淺灰
+const RANK_GRAY_HI = [55,65,81];    // 數值最大＝深灰
+function rankGray(v, lo, hi){
+  const t = hi > lo ? Math.min(1, Math.max(0, (v - lo) / (hi - lo))) : 0.5;
+  const c = RANK_GRAY_LO.map((c0, i) => Math.round(c0 + (RANK_GRAY_HI[i] - c0) * t));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+const barLabels = {id:'barLabels', afterDatasetsDraw(chart){
+  const {ctx} = chart;
+  chart.data.datasets.forEach((ds, dsIdx) => {
+    const meta = chart.getDatasetMeta(dsIdx);
+    meta.data.forEach((bar, i) => {
+      const val = ds.data[i]; if(val == null) return;
+      ctx.save();
+      ctx.fillStyle = '#1f2430'; ctx.font = '11px "Noto Sans TC",-apple-system,sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(val.toFixed(1), bar.x + 6, bar.y);
+      ctx.restore();
+    });
+  });
+}};
+const RANK_LABEL_FONT = '11.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
+let rankChart;
+function drawRank(){
+  const qi = D.quarters.indexOf(rankSel.value);
+  let rows = D.banks.map(b => ({n:b.n, g:b.g, v:b.v[qi]}))
+    .filter(r => r.v != null && !RANK_EXCLUDE.includes(r.n));
+  rows.sort((a, b) => a.v - b.v); // 由小到大；1＝最接近/跌破下限者
+  rows.forEach((r, i) => { r.rank = i + 1; });
+  const pinIdx = rows.findIndex(r => r.n === RANK_PIN);
+  if(pinIdx > 0){ const [pin] = rows.splice(pinIdx, 1); rows.unshift(pin); } // 中國信託固定置頂，但保留其原始排名數字
+  const maxVal = Math.max(...rows.map(r => r.v));
+  const minVal = Math.min(...rows.map(r => r.v));
+
+  // 三欄（名次／銀行／分類）改用畫布直接手繪、各自固定 x 起點，才能真正靠左對齊成格子
+  // （原本用全形空白 padStart/padEnd 塞進單一軸標籤字串，比例字型下對不齊）
+  const canvas = document.getElementById('rank-chart');
+  const mctx = canvas.getContext('2d');
+  mctx.font = RANK_LABEL_FONT;
+  const padX = 4, colGap = 10;
+  const rankColW = Math.max(...rows.map(r => mctx.measureText(String(r.rank)).width));
+  const nameColW = Math.max(...rows.map(r => mctx.measureText(r.n).width));
+  const groupColW = Math.max(...rows.map(r => mctx.measureText('（' + r.g + '）').width));
+  const rankX = padX, nameX = rankX + rankColW + colGap, groupX = nameX + nameColW + colGap;
+  const labelAreaWidth = Math.ceil(groupX + groupColW + padX);
+
+  const rankRowLabels = {id:'rankRowLabels', afterDraw(chart){
+    const y = chart.scales.y, ctx = chart.ctx;
+    ctx.save(); ctx.font = RANK_LABEL_FONT; ctx.fillStyle = '#5b6472';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    rows.forEach((r, i) => {
+      const yp = y.getPixelForValue(i);
+      ctx.fillText(String(r.rank), y.left + rankX, yp);
+      ctx.fillText(r.n, y.left + nameX, yp);
+      ctx.fillText('（' + r.g + '）', y.left + groupX, yp);
+    });
+    ctx.restore();
+  }};
+
+  if(rankChart) rankChart.destroy();
+  rankChart = new Chart(canvas, {type:'bar',
+    data:{labels:rows.map(() => ''), datasets:[{data:rows.map(r => r.v),
+      backgroundColor:rows.map(r => rankGray(r.v, minVal, maxVal)), borderRadius:3}]},
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{
+        title:c => rows[c[0].dataIndex].n,
+        label:c => c.parsed.x + '%（' + rows[c.dataIndex].g + '）'}}},
+      scales:{x:{title:{display:true,text:'LCR %'}, suggestedMax:maxVal * 1.12},
+              y:{ticks:{display:false}, afterFit(scale){ scale.width = labelAreaWidth; }}}},
+    plugins:[line100, barLabels, rankRowLabels]});
+}
+rankSel.addEventListener('change', drawRank);
+drawRank();
+
+// ---------- 3 單行檢視 ----------
+const bankSel = document.getElementById('bank-sel');
+const BANK_SEL_PIN = '中國信託'; // 固定顯示在最上方
+let bankSelOrder = D.banks.slice().sort((a, b) => {
+  const ga = GROUP_ORDER.indexOf(a.g), gb = GROUP_ORDER.indexOf(b.g);
+  if(ga !== gb) return ga - gb;
+  return strokeCollator.compare(a.n, b.n);
+});
+const bankPinIdx = bankSelOrder.findIndex(b => b.n === BANK_SEL_PIN);
+if(bankPinIdx > 0){ const [pin] = bankSelOrder.splice(bankPinIdx, 1); bankSelOrder.unshift(pin); }
+bankSelOrder.forEach(b => bankSel.add(new Option('（' + b.g + '）' + b.n, b.n)));
+bankSel.value = BANK_SEL_PIN;
+const bankRangeFrom = document.getElementById('bank-range-from');
+const bankRangeTo = document.getElementById('bank-range-to');
+D.quarters.forEach(q => { bankRangeFrom.add(new Option(q, q)); bankRangeTo.add(new Option(q, q)); });
+bankRangeFrom.value = D.quarters[0];
+bankRangeTo.value = D.quarters[D.quarters.length - 1];
+function bankRangeIdx(){
+  let a = D.quarters.indexOf(bankRangeFrom.value), b = D.quarters.indexOf(bankRangeTo.value);
+  if(a > b){ [a, b] = [b, a]; }
+  return [a, b];
+}
+let bankChart;
+function pstdev(a){ const m = a.reduce((x,y)=>x+y,0)/a.length; return Math.sqrt(a.reduce((s,v)=>s+(v-m)**2,0)/a.length); }
+function drawBank(){
+  const b = bankObj(bankSel.value);
+  const [ra, rb] = bankRangeIdx();
+  const labels = D.quarters.slice(ra, rb + 1);
+  const vArr = b.v.slice(ra, rb + 1);
+  const avgArr = D.avg.slice(ra, rb + 1);
+  const vals = vArr.filter(v => v != null);
+  const li = lastIdx(vArr); const cur = li >= 0 ? vArr[li] : null;
+  let dec = 0; const s = vals;
+  for(let k = s.length-1; k > 0; k--){ if(s[k] < s[k-1]) dec++; else break; }
+  const l8 = vals.slice(-8);
+  const stats = [
+    ['最新（' + (li>=0 ? labels[li] : '—') + '）', cur != null ? cur : '—', cur != null && cur < 115 ? 'red' : ''],
+    ['距 100% 緩衝', cur != null ? (cur-100).toFixed(1) + ' pp' : '—', cur != null && cur < 115 ? 'red' : 'gold'],
+    ['期間平均', vals.length ? (vals.reduce((x,y)=>x+y,0)/vals.length).toFixed(1) : '—', ''],
+    ['期間最低', vals.length ? Math.min(...vals) : '—', ''],
+    ['期間最高', vals.length ? Math.max(...vals) : '—', ''],
+    ['近8季波動（σ）', l8.length >= 6 ? pstdev(l8).toFixed(1) : '—', ''],
+    ['連續下滑季數', dec, dec >= 2 ? 'red' : '']
+  ];
+  document.getElementById('bank-stats').innerHTML = stats.map(s2 =>
+    `<div class="scard"><div class="k">${s2[0]}</div><div class="v ${s2[2]}">${s2[1]}</div></div>`).join('');
+  if(bankChart) bankChart.destroy();
+  bankChart = new Chart(document.getElementById('bank-chart'), {type:'line',
+    data:{labels, datasets:[
+      {label:b.n, data:vArr, borderColor:bcolor(b.n, 0), backgroundColor:rgba(bcolor(b.n, 0), .12), fill:true, spanGaps:true, pointRadius:2.5, borderWidth:2.2, tension:.25},
+      {label:'全體平均', data:avgArr, borderColor:'#334155', borderDash:[6,4], pointRadius:0, borderWidth:1.5, tension:.25}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}},
+      scales:{y:{title:{display:true,text:'LCR %'}}}},
+    plugins:[line100]});
+}
+bankSel.addEventListener('change', drawBank);
+bankRangeFrom.addEventListener('change', drawBank);
+bankRangeTo.addEventListener('change', drawBank);
+drawBank();
+
+// ---------- 4 分組走勢（中位數；純網銀選配＋對數軸） ----------
+const groups = ['公股/泛公股','民營','外銀子行','純網銀'];
+function median(a){ const s = [...a].sort((x,y) => x-y), m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2; }
+const gMedian = {};
+groups.forEach(g => { gMedian[g] = D.quarters.map((_, qi) => {
+  const vs = D.banks.filter(b => b.g === g).map(b => b.v[qi]).filter(v => v != null);
+  return vs.length ? +median(vs).toFixed(1) : null;
+}); });
+let groupChart;
+function drawGroup(){
+  const withVirtual = document.getElementById('show-virtual').checked;
+  const gs = withVirtual ? groups : groups.filter(g => g !== '純網銀');
+  if(groupChart) groupChart.destroy();
+  groupChart = new Chart(document.getElementById('group-chart'), {type:'line',
+    data:{labels:D.quarters, datasets:gs.map(g => ({label:g + '（中位數）', data:gMedian[g],
+        borderColor:GCOLOR[g], backgroundColor:GCOLOR[g], spanGaps:true, pointRadius:2, borderWidth:2.2, tension:.25}))
+      .concat([{label:'全體平均（央行加權）', data:D.avg, borderColor:'#334155', borderDash:[6,4], pointRadius:0, borderWidth:1.5, tension:.25}])},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}},
+      scales:{y:{type: withVirtual ? 'logarithmic' : 'linear',
+                 title:{display:true, text: withVirtual ? 'LCR %（對數軸）' : 'LCR %'}}}},
+    plugins:[line100]});
+}
+document.getElementById('show-virtual').addEventListener('change', drawGroup);
+drawGroup();
+
+// ---------- 5 預警與總表 ----------
+const lastQs = D.quarters.slice(-5);
+function tableRows(){
+  return D.banks.map(b => {
+    const li = lastIdx(b.v); const cur = li >= 0 ? b.v[li] : null;
+    const vals = b.v.filter(v => v != null);
+    let dec = 0; for(let k = vals.length-1; k > 0; k--){ if(vals[k] < vals[k-1]) dec++; else break; }
+    let flag = '';
+    if(cur != null){
+      if(cur < 115 && dec >= 2) flag = '🔴';
+      else if(cur < 115 || dec >= 3) flag = '🟡';
+    }
+    return {n:b.n, g:b.g, last5:lastQs.map(q => b.v[D.quarters.indexOf(q)]),
+            cur, buf:cur != null ? +(cur-100).toFixed(1) : null, dec, flag};
+  });
+}
+let sortKey = 'buf', sortAsc = true;
+function renderTable(){
+  const rows = tableRows().sort((a,b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if(av == null) return 1; if(bv == null) return -1;
+    return (av < bv ? -1 : av > bv ? 1 : 0) * (sortAsc ? 1 : -1);
+  });
+  const thead = document.querySelector('#main-table thead');
+  thead.innerHTML = '<tr><th data-k="n">銀行</th><th data-k="g">分組</th>' +
+    lastQs.map(q => `<th>${q}</th>`).join('') +
+    '<th data-k="buf">距100%緩衝</th><th data-k="dec">連續下滑</th><th data-k="flag">旗標</th></tr>';
+  thead.querySelectorAll('th[data-k]').forEach(th => th.addEventListener('click', () => {
+    const k = th.dataset.k; sortAsc = (sortKey === k) ? !sortAsc : true; sortKey = k; renderTable();
+  }));
+  document.querySelector('#main-table tbody').innerHTML = rows.map(r =>
+    `<tr><td>${r.n}<span class="tag ${GCLS[r.g]}">${r.g}</span></td><td>${r.g}</td>` +
+    r.last5.map(v => `<td>${v != null ? v : '—'}</td>`).join('') +
+    `<td style="${r.buf != null && r.buf < 15 ? 'color:#dc2626;font-weight:700' : ''}">${r.buf != null ? r.buf : '—'}</td>` +
+    `<td>${r.dec}</td><td class="flag ${r.flag === '🔴' ? 'r' : r.flag ? 'y' : ''}">${r.flag}</td></tr>`).join('');
+}
+renderTable();
+</script>
+</body>
+</html>
