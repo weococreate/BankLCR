@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<title>本國銀行主要財務及營運比率儀表板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
+<script src="metrics-data.js"></script>
+<style>
+  :root{
+    --bg:#f6f7fa; --panel:#ffffff; --panel2:#f3f5f9; --line:#e2e6ee;
+    --ink:#1f2430; --sub:#657081; --accent:#4f46e5; --gold:#a16207;
+    --gov:#2563eb; --priv:#7c3aed; --foreign:#0d9488; --virtual:#d97706;
+    --red:#dc2626; --green:#15803d;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:"Noto Sans TC",-apple-system,"PingFang TC",sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;}
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 20px 60px;}
+  header h1{font-size:22px;letter-spacing:1px;}
+  header .sub{color:var(--sub);font-size:13px;margin-top:4px;}
+  .metric-bar{display:flex;align-items:center;gap:10px;margin:14px 0;flex-wrap:wrap;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;padding:10px 14px;}
+  .metric-bar label{font-size:13px;color:var(--sub);}
+  .metric-bar select{min-width:260px;}
+  .metric-note{font-size:12.3px;color:var(--sub);width:100%;margin-top:2px;}
+  .tabs{display:flex;gap:8px;margin:18px 0 14px;flex-wrap:wrap;}
+  .tab{padding:8px 16px;border-radius:999px;border:1px solid var(--line);background:var(--panel);
+    color:var(--sub);cursor:pointer;font-size:13.5px;}
+  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;
+    box-shadow:0 1px 3px rgba(30,41,59,.06);}
+  .panel h2{font-size:15.5px;margin-bottom:4px;}
+  .panel .hint{color:var(--sub);font-size:12.5px;margin-bottom:12px;}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  .chip{padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--sub);cursor:pointer;font-size:12.5px;user-select:none;}
+  .chip.on{color:#fff;border-color:var(--accent);background:var(--accent);}
+  .chip.gov.on{background:var(--gov);border-color:var(--gov);}
+  .chip.priv.on{background:var(--priv);border-color:var(--priv);}
+  .chip.foreign.on{background:var(--foreign);border-color:var(--foreign);color:#fff;}
+  .chip.virtual.on{background:var(--virtual);border-color:var(--virtual);color:#fff;}
+  .bank-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:5px;max-height:170px;
+    overflow-y:auto;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--panel2);}
+  .bank-grid label{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--sub);cursor:pointer;white-space:nowrap;}
+  .bank-grid input{accent-color:var(--accent);}
+  .chart-box{position:relative;height:420px;margin-top:8px;}
+  .chart-box.tall{height:560px;}
+  .chart-box.xtall{height:900px;}
+  select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:8px;
+    padding:6px 10px;font-size:13.5px;font-family:inherit;}
+  .stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:12px 0;}
+  .scard{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;}
+  .scard .k{font-size:11.5px;color:var(--sub);}
+  .scard .v{font-size:20px;font-weight:700;margin-top:2px;}
+  .scard .v.red{color:var(--red);} .scard .v.gold{color:var(--gold);} .scard .v.green{color:var(--green);}
+  table{width:100%;border-collapse:collapse;font-size:12.8px;}
+  th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;}
+  th{color:var(--sub);font-weight:600;cursor:pointer;position:sticky;top:0;background:var(--panel);}
+  th:first-child,td:first-child{text-align:left;}
+  tr:hover td{background:rgba(79,70,229,.05);}
+  .tag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;margin-left:6px;}
+  .tag.gov{background:rgba(37,99,235,.10);color:var(--gov);}
+  .tag.priv{background:rgba(124,58,237,.10);color:var(--priv);}
+  .tag.foreign{background:rgba(13,148,136,.10);color:var(--foreign);}
+  .tag.virtual{background:rgba(217,119,6,.12);color:var(--virtual);}
+  .flag{font-size:12px;} .flag.r{color:var(--red);font-weight:700;} .flag.y{color:var(--gold);}
+  .table-scroll{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:10px;}
+  .note{color:var(--sub);font-size:12px;margin-top:10px;line-height:1.7;}
+  section{display:none;} section.show{display:block;}
+  .cat-head{font-size:13px;font-weight:700;color:var(--accent);margin:14px 0 6px;padding-top:8px;border-top:1px dashed var(--line);}
+  .cat-head:first-child{border-top:none;margin-top:0;}
+  .card-grid{display:grid;grid-template-columns:1fr;gap:6px;}
+  .card-row{display:grid;grid-template-columns:1.6fr .7fr .9fr .9fr;gap:8px;align-items:center;
+    padding:7px 10px;border-radius:8px;background:var(--panel2);font-size:12.8px;}
+  .card-row .nm{color:var(--ink);}
+  .card-row .val{font-weight:700;text-align:right;}
+  .card-row .val.green{color:var(--green);} .card-row .val.red{color:var(--red);}
+  .card-row .val.gold{color:var(--gold);} .card-row .val.gray{color:var(--ink);}
+  .card-row .pct{color:var(--sub);text-align:right;font-size:11.6px;}
+  .card-row .dir{color:var(--sub);text-align:right;font-size:11px;}
+  .flag-list{margin-top:14px;}
+  .flag-item{padding:8px 12px;border-left:3px solid var(--red);background:rgba(220,38,38,.06);border-radius:0 8px 8px 0;
+    margin-bottom:6px;font-size:12.8px;}
+  .flag-item.gold{border-color:var(--gold);background:rgba(161,98,7,.07);}
+  .explain-item{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:8px;}
+  .explain-item h3{font-size:13.5px;margin-bottom:2px;}
+  .explain-item h3 .unit{color:var(--sub);font-weight:400;font-size:12px;margin-left:6px;}
+  .explain-item h3 .th{color:var(--red);font-weight:400;font-size:11.5px;margin-left:6px;}
+  .explain-item .def{color:var(--ink);font-size:12.6px;margin:4px 0 8px;line-height:1.7;}
+  .explain-hl{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .explain-hl .hi,.explain-hl .lo{border-radius:8px;padding:7px 10px;font-size:12.2px;line-height:1.6;}
+  .explain-hl .hi{background:rgba(21,128,61,.07);border-left:3px solid var(--green);}
+  .explain-hl .lo{background:rgba(220,38,38,.07);border-left:3px solid var(--red);}
+  .explain-hl b{display:block;font-size:11.5px;color:var(--sub);margin-bottom:2px;}
+  @media (max-width:640px){ .explain-hl{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>📊 本國銀行主要財務及營運比率儀表板 <span style="color:var(--sub);font-weight:400;font-size:14px;">CAMELS 27 項指標</span></h1>
+  <div class="sub" id="header-sub">資料期間 loading… · 來源：中央銀行「本國銀行營運績效季報 — 主要財務及營運比率」</div>
+</header>
+
+<div class="metric-bar">
+  <label for="metric-sel">指標：</label>
+  <select id="metric-sel"></select>
+  <div class="metric-note" id="metric-note"></div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-sec="trend">📈 趨勢比較</button>
+  <button class="tab" data-sec="rank">🏁 單季排行</button>
+  <button class="tab" data-sec="bank">🔍 單行檢視</button>
+  <button class="tab" data-sec="group">🧩 分組走勢</button>
+  <button class="tab" data-sec="table">⚠️ 預警與總表</button>
+  <button class="tab" data-sec="card">🩺 銀行體檢卡</button>
+  <button class="tab" data-sec="explain">📖 指標說明</button>
+</div>
+
+<section id="sec-trend" class="show">
+  <div class="panel">
+    <h2>多行走勢疊圖（不同銀行跨期比較）</h2>
+    <div class="hint">勾選要比較的銀行；線色＝各行企業識別色（近似）；灰虛線＝全體平均，紅色水平虛線＝門檻（如有）。
+      　區間：<select id="range-from"></select> ～ <select id="range-to"></select></div>
+    <div class="chips" id="quick-chips">
+      <span class="chip" data-q="big5">五大民營</span>
+      <span class="chip gov" data-q="gov">公股/泛公股</span>
+      <span class="chip priv" data-q="priv">民營</span>
+      <span class="chip foreign" data-q="foreign">外銀子行</span>
+      <span class="chip virtual" data-q="virtual">純網銀</span>
+      <span class="chip" data-q="none">清空</span>
+    </div>
+    <div class="bank-grid" id="bank-checks"></div>
+    <div class="chart-box"><canvas id="trend-chart"></canvas></div>
+  </div>
+</section>
+
+<section id="sec-rank">
+  <div class="panel">
+    <h2>單季排行（同一季不同銀行比較）</h2>
+    <div class="hint">季度：<select id="rank-q"></select>　顏色＝各行企業識別色（近似，灰階深淺依數值大小）；紅線＝門檻（如有）。
+      <span id="rank-exclude-note"></span></div>
+    <div class="chart-box xtall"><canvas id="rank-chart"></canvas></div>
+  </div>
+</section>
+
+<section id="sec-bank">
+  <div class="panel">
+    <h2>單行檢視（同家銀行跨期比較）</h2>
+    <div class="hint">銀行：<select id="bank-sel"></select>
+      　區間：<select id="bank-range-from"></select> ～ <select id="bank-range-to"></select></div>
+    <div class="stat-cards" id="bank-stats"></div>
+    <div class="chart-box"><canvas id="bank-chart"></canvas></div>
+  </div>
+</section>
+
+<section id="sec-group">
+  <div class="panel">
+    <h2>分組走勢（組內中位數）</h2>
+    <div class="hint">各組取<b>中位數</b>而非平均——避免小型行極端值拉高簡單平均。
+      灰虛線＝央行公佈之全體平均（溫塞平均，已排除極端值影響）。<br>
+      <label style="cursor:pointer;"><input type="checkbox" id="show-virtual" style="accent-color:var(--accent);"> 顯示純網銀（開業初期部分指標數值極端，勾選後改用對數軸，僅適用於恆正指標）</label></div>
+    <div class="chart-box"><canvas id="group-chart"></canvas></div>
+  </div>
+</section>
+
+<section id="sec-table">
+  <div class="panel">
+    <h2>預警與資料總表</h2>
+    <div class="hint" id="table-hint">依「距門檻緩衝」由小到大排序（無門檻指標依偏離全體中位數幅度排序）。點欄位標題可重新排序。</div>
+    <div class="table-scroll"><table id="main-table"><thead></thead><tbody></tbody></table></div>
+    <div class="note">空值＝該期不適用、未營業、或該指標尚未申報（詳見指標說明）。<br>
+    資料處理：`~/Downloads/LCR/`（metrics_update.py 抽取央行季報 → gen_dashboard_data.py → metrics-data.js）。每季更新照 全指標分析計劃書-20260706.md §6。</div>
+  </div>
+</section>
+
+<section id="sec-card">
+  <div class="panel">
+    <h2>銀行體檢卡</h2>
+    <div class="hint">選一家銀行：<select id="card-bank-sel"></select>　各指標取該行最新一期有值資料，與同期全體 P25／P50／P75 比較；
+      <span style="color:var(--green);font-weight:700;">綠</span>＝優於門檻或前段班、
+      <span style="color:var(--red);font-weight:700;">紅</span>＝低於門檻或後段班、
+      <span style="color:var(--gold);font-weight:700;">黃</span>＝區間型指標偏離中段。</div>
+    <div class="card-grid" id="card-grid"></div>
+    <div class="flag-list" id="card-flags"></div>
+  </div>
+</section>
+
+<section id="sec-explain">
+  <div class="panel">
+    <h2>指標說明與判讀指引</h2>
+    <div class="hint">依 CAMELS 六大類列出全部 27 項指標：白話定義、數值偏高／偏低各代表什麼意義。
+      <span style="color:var(--red);">紅字</span>＝法定或業界慣例門檻；無門檻指標一律以「與同業相對高低」判讀，不代表越高或越低本身就是好或壞。</div>
+    <div id="explain-list"></div>
+  </div>
+</section>
+
+<div class="note" style="text-align:center;margin-top:16px;">資料僅供參考，實際資料以央行網站為主。</div>
+
+</div>
+<script>
+const CAT_NAME = {C:'資本適足性', A:'資產品質', E:'獲利能力', L:'流動性', S:'利率敏感性', G:'主要業務年成長率'};
+const GCOLOR = {'公股/泛公股':'#2563eb','民營':'#7c3aed','外銀子行':'#0d9488','純網銀':'#d97706'};
+const GCLS = {'公股/泛公股':'gov','民營':'priv','外銀子行':'foreign','純網銀':'virtual'};
+const BIG5 = ['中國信託','國泰世華','兆豐銀行','玉山銀行','台北富邦'];
+const GROUP_ORDER = ['公股/泛公股','民營','外銀子行','純網銀'];
+const PALETTE = ['#4f46e5','#b45309','#0d9488','#db2777','#2563eb','#ea580c','#16a34a','#9333ea','#0891b2','#dc2626','#65a30d','#475569'];
+const strokeCollator = new Intl.Collator('zh', {collation:'stroke'});
+const BANK_COLOR = {
+  '臺灣銀行':'#1a5ca8','土地銀行':'#1e8a4c','合作金庫':'#0e6fb5','第一銀行':'#0c7a3e',
+  '華南銀行':'#c8102e','彰化銀行':'#b5342a','兆豐銀行':'#8e1537','臺灣中小':'#d2691e',
+  '高雄銀行':'#2e6fa3','全國農業':'#4a7c2f','中國輸出':'#6b7280',
+  '上海銀行':'#144a8f','台北富邦':'#0053a0','國泰世華':'#00873e','王道銀行':'#f08300',
+  '台中銀行':'#a02040','京城銀行':'#c9a227','瑞興銀行':'#7a4a2b','華泰銀行':'#8d4b9e',
+  '臺灣新光':'#e5007e','陽信銀行':'#f39c12','板信銀行':'#3f6fb0','三信銀行':'#c0392b',
+  '聯邦銀行':'#28559a','遠東銀行':'#2f7d5a','元大銀行':'#d92626','永豐銀行':'#57a639',
+  '玉山銀行':'#00654f','凱基銀行':'#e03a3e','台新國際':'#e60039','安泰銀行':'#e8792a',
+  '中國信託':'#24a09a','日盛銀行':'#d94f2b',
+  '花旗(台':'#056dae','渣打國際':'#00a546','滙豐(台':'#db0011','星展(台':'#e4002b',
+  '將來商業':'#5b4de0','連線銀行':'#06c755','樂天銀行':'#bf0000'
+};
+function bcolor(n, i){ return BANK_COLOR[n] || PALETTE[(i||0) % PALETTE.length]; }
+function rgba(hex, a){ const h = hex.replace('#',''); return `rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${a})`; }
+Chart.defaults.color = '#5b6472';
+Chart.defaults.borderColor = '#e6e9f0';
+Chart.defaults.font.family = '"Noto Sans TC",-apple-system,sans-serif';
+
+function bankObj(n){ return MD.banks.find(b => b.n === n); }
+function lastIdx(v){ for(let i=v.length-1;i>=0;i--) if(v[i]!=null) return i; return -1; }
+function median(a){ const s = [...a].sort((x,y) => x-y), m = s.length >> 1;
+  return s.length ? (s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2) : null; }
+function quantile(sortedAsc, q){
+  if(!sortedAsc.length) return null;
+  const pos = (sortedAsc.length-1)*q, base = Math.floor(pos), rest = pos-base;
+  return sortedAsc[base+1] !== undefined ? sortedAsc[base] + rest*(sortedAsc[base+1]-sortedAsc[base]) : sortedAsc[base];
+}
+function pstdev(a){ const m = a.reduce((x,y)=>x+y,0)/a.length; return Math.sqrt(a.reduce((s,v)=>s+(v-m)**2,0)/a.length); }
+
+// ---------- 指標選單 ----------
+let curId = MD.metrics['lcr'] ? 'lcr' : Object.keys(METRICS_DICT)[0];
+const metricSel = document.getElementById('metric-sel');
+(function buildMetricSelect(){
+  let curCat = null, optgroup = null;
+  Object.keys(METRICS_DICT).forEach(id => {
+    const m = METRICS_DICT[id];
+    if(m.category !== curCat){ curCat = m.category; optgroup = document.createElement('optgroup');
+      optgroup.label = `【${curCat}】${CAT_NAME[curCat]}`; metricSel.appendChild(optgroup); }
+    optgroup.appendChild(new Option(m.name, id));
+  });
+  metricSel.value = curId;
+})();
+function curMeta(){ return METRICS_DICT[curId]; }
+function curSeries(bankName){ return (MD.metrics[curId].banks[bankName]) || MD.quarters.map(()=>null); }
+function curAvg(){ return MD.metrics[curId].avg; }
+function updateHeaderNote(){
+  const m = curMeta();
+  document.getElementById('header-sub').textContent =
+    `資料期間 ${MD.quarters[0]}–${MD.quarters[MD.quarters.length-1]} · 來源：中央銀行「本國銀行營運績效季報 — 主要財務及營運比率」 · 單位 ${m.unit}` +
+    (m.threshold != null ? ` · 門檻 ${m.threshold}${m.unit}` : '');
+  document.getElementById('metric-note').textContent = m.note || '';
+}
+
+// ---------- 門檻線 plugin（泛化自 line100，讀 curMeta().threshold）----------
+const metricLine = {id:'metricLine', afterDraw(c){
+  const th = curMeta().threshold; if(th == null) return;
+  const y = c.scales.y, x = c.scales.x; if(!y||!x) return;
+  const ctx = c.ctx; let px, horizontal = c.config.options.indexAxis === 'y';
+  ctx.save(); ctx.strokeStyle = 'rgba(220,38,38,.7)'; ctx.setLineDash([5,4]); ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  if(horizontal){ px = x.getPixelForValue(th); ctx.moveTo(px, y.top); ctx.lineTo(px, y.bottom); }
+  else { px = y.getPixelForValue(th); ctx.moveTo(x.left, px); ctx.lineTo(x.right, px); }
+  ctx.stroke(); ctx.restore();
+}};
+
+// ---------- tab 切換 ----------
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x===t));
+  document.querySelectorAll('section').forEach(s => s.classList.toggle('show', s.id === 'sec-'+t.dataset.sec));
+}));
+
+// ---------- 1 趨勢比較 ----------
+const checksBox = document.getElementById('bank-checks');
+MD.banks.forEach(b => {
+  const l = document.createElement('label');
+  l.innerHTML = `<input type="checkbox" value="${b.n}"> ${b.n}`;
+  checksBox.appendChild(l);
+});
+let trendChart;
+function selectedBanks(){ return [...checksBox.querySelectorAll('input:checked')].map(i => i.value); }
+const rangeFrom = document.getElementById('range-from');
+const rangeTo = document.getElementById('range-to');
+MD.quarters.forEach(q => { rangeFrom.add(new Option(q, q)); rangeTo.add(new Option(q, q)); });
+rangeFrom.value = MD.quarters[0];
+rangeTo.value = MD.quarters[MD.quarters.length - 1];
+function rangeIdx(){
+  let a = MD.quarters.indexOf(rangeFrom.value), b = MD.quarters.indexOf(rangeTo.value);
+  if(a > b){ [a, b] = [b, a]; }
+  return [a, b];
+}
+function drawTrend(){
+  const sel = selectedBanks();
+  const [a, b] = rangeIdx();
+  const labels = MD.quarters.slice(a, b + 1);
+  const ds = sel.map((n,i) => ({label:n, data:curSeries(n).slice(a, b + 1), borderColor:bcolor(n, i),
+    backgroundColor:bcolor(n, i), spanGaps:true, pointRadius:2, borderWidth:2, tension:.25}));
+  ds.push({label:'全體平均', data:curAvg().slice(a, b + 1), borderColor:'#334155', borderDash:[6,4], pointRadius:0, borderWidth:1.6, tension:.25});
+  if(trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById('trend-chart'), {type:'line',
+    data:{labels, datasets:ds},
+    options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'nearest', intersect:false},
+      plugins:{legend:{position:'bottom'}}, scales:{y:{title:{display:true,text:`${curMeta().name}（${curMeta().unit}）`}}}},
+    plugins:[metricLine]});
+}
+rangeFrom.addEventListener('change', drawTrend);
+rangeTo.addEventListener('change', drawTrend);
+checksBox.addEventListener('change', drawTrend);
+document.getElementById('quick-chips').addEventListener('click', e => {
+  const q = e.target.dataset.q; if(!q) return;
+  e.target.classList.toggle('on');
+  const boxes = [...checksBox.querySelectorAll('input')];
+  if(q === 'none'){ boxes.forEach(b => b.checked = false); document.querySelectorAll('#quick-chips .chip').forEach(c=>c.classList.remove('on')); }
+  else if(q === 'big5'){ const on = e.target.classList.contains('on'); boxes.forEach(b => { if(BIG5.includes(b.value)) b.checked = on; }); }
+  else { const g = {gov:'公股/泛公股', priv:'民營', foreign:'外銀子行', virtual:'純網銀'}[q];
+         const on = e.target.classList.contains('on');
+         boxes.forEach(b => { if(bankObj(b.value).g === g) b.checked = on; }); }
+  drawTrend();
+});
+[...checksBox.querySelectorAll('input')].forEach(b => { if(BIG5.includes(b.value)) b.checked = true; });
+
+// ---------- 2 單季排行（離群值動態偵測，取代 LCR 版硬編碼名單）----------
+const rankSel = document.getElementById('rank-q');
+MD.quarters.slice().reverse().forEach(q => rankSel.add(new Option(q, q)));
+const RANK_PIN_CANDIDATES = ['中國信託', '臺灣銀行'];
+const RANK_GRAY_LO = [216,219,226];
+const RANK_GRAY_HI = [55,65,81];
+function rankGray(v, lo, hi){
+  const t = hi > lo ? Math.min(1, Math.max(0, (v - lo) / (hi - lo))) : 0.5;
+  const c = RANK_GRAY_LO.map((c0, i) => Math.round(c0 + (RANK_GRAY_HI[i] - c0) * t));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+// 動態離群值偵測：以穩健 MAD（median absolute deviation）判斷是否遠超中位數，
+// 只排除「遠高於中位數、會把長條圖其餘比例壓縮到看不清楚」的極端值，不做方向性判斷（低值不影響長條圖比例，不排除）
+function detectOutliers(rows){
+  const vals = rows.map(r => r.v).sort((a,b)=>a-b);
+  if(vals.length < 5) return new Set();
+  const med = median(vals);
+  const mad = median(vals.map(v => Math.abs(v-med))) || 0;
+  if(mad === 0) return new Set();
+  const cutoff = med + 8 * mad * 1.4826;
+  return new Set(rows.filter(r => r.v > cutoff && r.v > med * 3).map(r => r.n));
+}
+const barLabels = {id:'barLabels', afterDatasetsDraw(chart){
+  const {ctx} = chart;
+  chart.data.datasets.forEach((ds, dsIdx) => {
+    const meta = chart.getDatasetMeta(dsIdx);
+    meta.data.forEach((bar, i) => {
+      const val = ds.data[i]; if(val == null) return;
+      ctx.save();
+      ctx.fillStyle = '#1f2430'; ctx.font = '11px "Noto Sans TC",-apple-system,sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(val.toFixed(2), bar.x + 6, bar.y);
+      ctx.restore();
+    });
+  });
+}};
+const RANK_LABEL_FONT = '11.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
+let rankChart;
+function drawRank(){
+  const qi = MD.quarters.indexOf(rankSel.value);
+  let allRows = MD.banks.map(b => ({n:b.n, g:b.g, v:curSeries(b.n)[qi]})).filter(r => r.v != null);
+  const outliers = detectOutliers(allRows);
+  let rows = allRows.filter(r => !outliers.has(r.n));
+  document.getElementById('rank-exclude-note').textContent = outliers.size
+    ? `　（已排除極端離群值以免壓縮比例：${[...outliers].join('、')}）` : '';
+  if(!rows.length){
+    document.getElementById('rank-exclude-note').textContent += '　該季本指標無資料。';
+    if(rankChart){ rankChart.destroy(); rankChart = null; }
+    return;
+  }
+  rows.sort((a, b) => a.v - b.v);
+  rows.forEach((r, i) => { r.rank = i + 1; });
+  const pin = RANK_PIN_CANDIDATES.find(n => rows.some(r => r.n === n));
+  if(pin){ const pinIdx = rows.findIndex(r => r.n === pin);
+    if(pinIdx > 0){ const [p] = rows.splice(pinIdx, 1); rows.unshift(p); } }
+  const maxVal = Math.max(...rows.map(r => r.v));
+  const minVal = Math.min(...rows.map(r => r.v));
+
+  const canvas = document.getElementById('rank-chart');
+  const mctx = canvas.getContext('2d');
+  mctx.font = RANK_LABEL_FONT;
+  const padX = 4, colGap = 10;
+  const rankColW = Math.max(...rows.map(r => mctx.measureText(String(r.rank)).width));
+  const nameColW = Math.max(...rows.map(r => mctx.measureText(r.n).width));
+  const groupColW = Math.max(...rows.map(r => mctx.measureText('（' + r.g + '）').width));
+  const rankX = padX, nameX = rankX + rankColW + colGap, groupX = nameX + nameColW + colGap;
+  const labelAreaWidth = Math.ceil(groupX + groupColW + padX);
+
+  const rankRowLabels = {id:'rankRowLabels', afterDraw(chart){
+    const y = chart.scales.y, ctx = chart.ctx;
+    ctx.save(); ctx.font = RANK_LABEL_FONT; ctx.fillStyle = '#5b6472';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    rows.forEach((r, i) => {
+      const yp = y.getPixelForValue(i);
+      ctx.fillText(String(r.rank), y.left + rankX, yp);
+      ctx.fillText(r.n, y.left + nameX, yp);
+      ctx.fillText('（' + r.g + '）', y.left + groupX, yp);
+    });
+    ctx.restore();
+  }};
+
+  if(rankChart) rankChart.destroy();
+  rankChart = new Chart(canvas, {type:'bar',
+    data:{labels:rows.map(() => ''), datasets:[{data:rows.map(r => r.v),
+      backgroundColor:rows.map(r => rankGray(r.v, minVal, maxVal)), borderRadius:3}]},
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{
+        title:c => rows[c[0].dataIndex].n,
+        label:c => c.parsed.x + curMeta().unit + '（' + rows[c.dataIndex].g + '）'}}},
+      scales:{x:{title:{display:true,text:`${curMeta().name}（${curMeta().unit}）`}, suggestedMax:maxVal + Math.abs(maxVal)*0.12},
+              y:{ticks:{display:false}, afterFit(scale){ scale.width = labelAreaWidth; }}}},
+    plugins:[metricLine, barLabels, rankRowLabels]});
+}
+rankSel.addEventListener('change', drawRank);
+
+// ---------- 3 單行檢視 ----------
+const bankSel = document.getElementById('bank-sel');
+const BANK_SEL_PIN = '中國信託';
+let bankSelOrder = MD.banks.slice().sort((a, b) => {
+  const ga = GROUP_ORDER.indexOf(a.g), gb = GROUP_ORDER.indexOf(b.g);
+  if(ga !== gb) return ga - gb;
+  return strokeCollator.compare(a.n, b.n);
+});
+const bankPinIdx = bankSelOrder.findIndex(b => b.n === BANK_SEL_PIN);
+if(bankPinIdx > 0){ const [pin] = bankSelOrder.splice(bankPinIdx, 1); bankSelOrder.unshift(pin); }
+bankSelOrder.forEach(b => bankSel.add(new Option('（' + b.g + '）' + b.n, b.n)));
+bankSel.value = BANK_SEL_PIN;
+const bankRangeFrom = document.getElementById('bank-range-from');
+const bankRangeTo = document.getElementById('bank-range-to');
+MD.quarters.forEach(q => { bankRangeFrom.add(new Option(q, q)); bankRangeTo.add(new Option(q, q)); });
+bankRangeFrom.value = MD.quarters[0];
+bankRangeTo.value = MD.quarters[MD.quarters.length - 1];
+function bankRangeIdx(){
+  let a = MD.quarters.indexOf(bankRangeFrom.value), b = MD.quarters.indexOf(bankRangeTo.value);
+  if(a > b){ [a, b] = [b, a]; }
+  return [a, b];
+}
+let bankChart;
+function trendDeclineCount(vals, direction){
+  // direction-aware：higher_better 數「連續下滑」；lower_better 數「連續上升」；range 兩者皆不特別強調，仍以下滑計
+  let dec = 0;
+  for(let k = vals.length-1; k > 0; k--){
+    const worse = direction === 'lower_better' ? vals[k] > vals[k-1] : vals[k] < vals[k-1];
+    if(worse) dec++; else break;
+  }
+  return dec;
+}
+function drawBank(){
+  const b = bankObj(bankSel.value);
+  const meta = curMeta();
+  const [ra, rb] = bankRangeIdx();
+  const labels = MD.quarters.slice(ra, rb + 1);
+  const vArr = curSeries(b.n).slice(ra, rb + 1);
+  const avgArr = curAvg().slice(ra, rb + 1);
+  const vals = vArr.filter(v => v != null);
+  const li = lastIdx(vArr); const cur = li >= 0 ? vArr[li] : null;
+  const dec = trendDeclineCount(vals, meta.direction);
+  const l8 = vals.slice(-8);
+  const belowStd = meta.threshold != null && cur != null &&
+    (meta.direction === 'lower_better' ? cur > meta.threshold : cur < meta.threshold);
+  const stats = [
+    ['最新（' + (li>=0 ? labels[li] : '—') + '）', cur != null ? cur : '—', belowStd ? 'red' : ''],
+    ['距門檻緩衝', (meta.threshold != null && cur != null) ?
+        (meta.direction === 'lower_better' ? (meta.threshold-cur).toFixed(1) : (cur-meta.threshold).toFixed(1)) + meta.unit : '（無門檻）',
+        belowStd ? 'red' : (meta.threshold != null ? 'gold' : '')],
+    ['期間平均', vals.length ? (vals.reduce((x,y)=>x+y,0)/vals.length).toFixed(2) : '—', ''],
+    ['期間最低', vals.length ? Math.min(...vals) : '—', ''],
+    ['期間最高', vals.length ? Math.max(...vals) : '—', ''],
+    ['近8季波動（σ）', l8.length >= 6 ? pstdev(l8).toFixed(2) : '—', ''],
+    [meta.direction === 'lower_better' ? '連續惡化(上升)季數' : '連續惡化(下滑)季數', dec, dec >= 2 ? 'red' : '']
+  ];
+  document.getElementById('bank-stats').innerHTML = stats.map(s2 =>
+    `<div class="scard"><div class="k">${s2[0]}</div><div class="v ${s2[2]}">${s2[1]}</div></div>`).join('');
+  if(bankChart) bankChart.destroy();
+  bankChart = new Chart(document.getElementById('bank-chart'), {type:'line',
+    data:{labels, datasets:[
+      {label:b.n, data:vArr, borderColor:bcolor(b.n, 0), backgroundColor:rgba(bcolor(b.n, 0), .12), fill:true, spanGaps:true, pointRadius:2.5, borderWidth:2.2, tension:.25},
+      {label:'全體平均', data:avgArr, borderColor:'#334155', borderDash:[6,4], pointRadius:0, borderWidth:1.5, tension:.25}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}},
+      scales:{y:{title:{display:true,text:`${meta.name}（${meta.unit}）`}}}},
+    plugins:[metricLine]});
+}
+bankSel.addEventListener('change', drawBank);
+bankRangeFrom.addEventListener('change', drawBank);
+bankRangeTo.addEventListener('change', drawBank);
+
+// ---------- 4 分組走勢 ----------
+const groups = ['公股/泛公股','民營','外銀子行','純網銀'];
+let groupChart;
+function drawGroup(){
+  const meta = curMeta();
+  const gMedian = {};
+  groups.forEach(g => { gMedian[g] = MD.quarters.map((_, qi) => {
+    const vs = MD.banks.filter(b => b.g === g).map(b => curSeries(b.n)[qi]).filter(v => v != null);
+    return vs.length ? +median(vs).toFixed(2) : null;
+  }); });
+  const withVirtual = document.getElementById('show-virtual').checked;
+  const allPositive = MD.quarters.every((_, qi) => groups.every(g => (gMedian[g][qi] == null || gMedian[g][qi] > 0)));
+  const useLog = withVirtual && allPositive;
+  const gs = withVirtual ? groups : groups.filter(g => g !== '純網銀');
+  if(groupChart) groupChart.destroy();
+  groupChart = new Chart(document.getElementById('group-chart'), {type:'line',
+    data:{labels:MD.quarters, datasets:gs.map(g => ({label:g + '（中位數）', data:gMedian[g],
+        borderColor:GCOLOR[g], backgroundColor:GCOLOR[g], spanGaps:true, pointRadius:2, borderWidth:2.2, tension:.25}))
+      .concat([{label:'全體平均', data:curAvg(), borderColor:'#334155', borderDash:[6,4], pointRadius:0, borderWidth:1.5, tension:.25}])},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}},
+      scales:{y:{type: useLog ? 'logarithmic' : 'linear',
+                 title:{display:true, text: `${meta.name}（${meta.unit}${useLog ? '·對數軸' : ''}）`}}}},
+    plugins:[metricLine]});
+}
+document.getElementById('show-virtual').addEventListener('change', drawGroup);
+
+// ---------- 5 預警與總表 ----------
+function bufferOf(cur, meta){
+  if(meta.threshold == null || cur == null) return null;
+  return +(meta.direction === 'lower_better' ? meta.threshold - cur : cur - meta.threshold).toFixed(2);
+}
+function tableRows(){
+  const meta = curMeta();
+  const lastQs = MD.quarters.slice(-5);
+  return MD.banks.map(b => {
+    const s = curSeries(b.n);
+    const li = lastIdx(s); const cur = li >= 0 ? s[li] : null;
+    const vals = s.filter(v => v != null);
+    const dec = trendDeclineCount(vals, meta.direction);
+    const buf = bufferOf(cur, meta);
+    let flag = '';
+    if(cur != null){
+      if(meta.threshold != null){
+        if(buf < 0 && dec >= 2) flag = '🔴';
+        else if(buf < 0 || dec >= 3) flag = '🟡';
+      } else if(dec >= 3){
+        flag = '🟡';
+      }
+    }
+    return {n:b.n, g:b.g, last5:lastQs.map(q => s[MD.quarters.indexOf(q)]),
+            cur, buf, dec, flag};
+  });
+}
+let sortKey = 'buf', sortAsc = true;
+function renderTable(){
+  const meta = curMeta();
+  document.getElementById('table-hint').textContent = meta.threshold != null
+    ? `依「距門檻緩衝」由小到大排序；🔴＝已越過門檻且連續惡化、🟡＝越過門檻或連續惡化 3 季以上。門檻＝${meta.threshold}${meta.unit}（${meta.direction==='lower_better'?'愈低愈佳':'愈高愈佳'}）。點欄位標題可重新排序。`
+    : `本指標無法定門檻，依「連續惡化季數」排序；🟡＝連續惡化 3 季以上。點欄位標題可重新排序。`;
+  const rows = tableRows().sort((a,b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if(av == null && bv == null) return 0;
+    if(av == null) return 1; if(bv == null) return -1;
+    return (av < bv ? -1 : av > bv ? 1 : 0) * (sortAsc ? 1 : -1);
+  });
+  const lastQs = MD.quarters.slice(-5);
+  const thead = document.querySelector('#main-table thead');
+  thead.innerHTML = '<tr><th data-k="n">銀行</th><th data-k="g">分組</th>' +
+    lastQs.map(q => `<th>${q}</th>`).join('') +
+    `<th data-k="buf">${meta.threshold != null ? '距門檻緩衝' : '（無門檻）'}</th><th data-k="dec">連續惡化</th><th data-k="flag">旗標</th></tr>`;
+  thead.querySelectorAll('th[data-k]').forEach(th => th.addEventListener('click', () => {
+    const k = th.dataset.k; sortAsc = (sortKey === k) ? !sortAsc : true; sortKey = k; renderTable();
+  }));
+  document.querySelector('#main-table tbody').innerHTML = rows.map(r =>
+    `<tr><td>${r.n}<span class="tag ${GCLS[r.g]}">${r.g}</span></td><td>${r.g}</td>` +
+    r.last5.map(v => `<td>${v != null ? v : '—'}</td>`).join('') +
+    `<td style="${r.buf != null && r.buf < 0 ? 'color:#dc2626;font-weight:700' : ''}">${r.buf != null ? r.buf : '—'}</td>` +
+    `<td>${r.dec}</td><td class="flag ${r.flag === '🔴' ? 'r' : r.flag ? 'y' : ''}">${r.flag}</td></tr>`).join('');
+}
+
+// ---------- 6 銀行體檢卡 ----------
+const cardBankSel = document.getElementById('card-bank-sel');
+bankSelOrder.forEach(b => cardBankSel.add(new Option('（' + b.g + '）' + b.n, b.n)));
+cardBankSel.value = BANK_SEL_PIN;
+function judge(mid, val, quarterIdx){
+  const meta = METRICS_DICT[mid];
+  const allVals = MD.banks.map(b => MD.metrics[mid].banks[b.n][quarterIdx]).filter(v => v != null).sort((a,b)=>a-b);
+  const p25 = quantile(allVals, .25), p50 = quantile(allVals, .5), p75 = quantile(allVals, .75);
+  let cls = 'gray';
+  if(val == null) return {cls:'na', p25, p50, p75};
+  if(meta.threshold != null && meta.direction !== 'range'){
+    const ok = meta.direction === 'higher_better' ? val >= meta.threshold : val <= meta.threshold;
+    cls = ok ? 'green' : 'red';
+  } else if(meta.direction === 'higher_better'){
+    cls = allVals.length < 4 ? 'gray' : (val >= p75 ? 'green' : (val <= p25 ? 'red' : 'gray'));
+  } else if(meta.direction === 'lower_better'){
+    cls = allVals.length < 4 ? 'gray' : (val <= p25 ? 'green' : (val >= p75 ? 'red' : 'gray'));
+  } else {
+    cls = allVals.length < 4 ? 'gray' : ((val < p25 || val > p75) ? 'gold' : 'gray');
+  }
+  return {cls, p25, p50, p75};
+}
+function renderCard(){
+  const bankName = cardBankSel.value;
+  const grid = document.getElementById('card-grid');
+  const flagsBox = document.getElementById('card-flags');
+  let html = '', curCat = null;
+  const flags = [];
+  Object.keys(METRICS_DICT).forEach(mid => {
+    const meta = METRICS_DICT[mid];
+    if(meta.category !== curCat){ curCat = meta.category;
+      html += `<div class="cat-head">【${curCat}】${CAT_NAME[curCat]}</div>`; }
+    const s = (MD.metrics[mid].banks[bankName]) || [];
+    const li = lastIdx(s);
+    const val = li >= 0 ? s[li] : null;
+    const q = li >= 0 ? MD.quarters[li] : '—';
+    const {cls, p50} = li >= 0 ? judge(mid, val, li) : {cls:'na', p50:null};
+    const dirLabel = meta.direction === 'higher_better' ? '↑佳' : meta.direction === 'lower_better' ? '↓佳' : '區間';
+    html += `<div class="card-row">
+      <div class="nm">${meta.name}<span style="color:var(--sub);font-size:11px;">（${q}）</span></div>
+      <div class="val ${cls}">${val != null ? val : '—'}${meta.unit}</div>
+      <div class="pct">全體中位數 ${p50 != null ? p50.toFixed(2) : '—'}</div>
+      <div class="dir">${dirLabel}${meta.threshold != null ? '　門檻'+meta.threshold : ''}</div>
+    </div>`;
+    if(val != null && (cls === 'red')){
+      const vals = s.filter(v => v != null);
+      const dec = trendDeclineCount(vals, meta.direction);
+      flags.push({mid, meta, val, q, dec, cls});
+    }
+  });
+  grid.innerHTML = html;
+  if(!flags.length){
+    flagsBox.innerHTML = '<div class="flag-item" style="border-color:var(--green);background:rgba(21,128,61,.06);">目前無指標觸發紅燈旗標。</div>';
+  } else {
+    flagsBox.innerHTML = '<h2 style="font-size:14px;margin-bottom:8px;">⚠️ 觸發旗標的指標</h2>' + flags.map(f =>
+      `<div class="flag-item">${f.meta.name}：最新（${f.q}）${f.val}${f.meta.unit}，${f.dec >= 2 ? `已連續惡化 ${f.dec} 季，` : ''}${
+        f.meta.direction === 'lower_better' ? '高於' : '低於'}門檻 ${f.meta.threshold}${f.meta.unit}</div>`).join('');
+  }
+}
+cardBankSel.addEventListener('change', renderCard);
+
+// ---------- 指標說明頁 ----------
+const METRIC_EXPLAIN = {
+  car_total: { def:'自有資本（第一類＋第二類資本）占風險加權資產的比例，衡量銀行自有資本吸收非預期損失的整體能力。',
+    hi:'資本緩衝厚，抵禦資產減損、景氣下行衝擊的能力強；但過高也可能代表資本未充分運用、股東資金效率偏低。',
+    lo:'資本緩衝薄，接近或跌破 10.5% 法定門檻可能觸發主管機關監理措施（增資、限制配息、業務限制）。' },
+  tier1_car: { def:'第一類資本（核心＋其他第一類，如普通股、永續債等）占風險性資產比例，只計最能立即吸收損失的資本，門檻較嚴格。',
+    hi:'核心資本品質與厚度佳，吸收損失能力強。',
+    lo:'核心資本偏薄，即使總資本適足率尚可，抗風險韌性仍可能不足。' },
+  cet1_car: { def:'普通股權益第一類資本（CET1，僅計普通股股本＋保留盈餘等最純粹股本）占風險性資產比例，是國際監理最重視的核心指標。',
+    hi:'股東權益結構紮實，資本品質最高、最無附帶條件。',
+    lo:'股本結構偏重特別股／次順位債等混合資本，監理彈性與吸收損失的優先順位較差。' },
+  leverage_ratio: { def:'第一類資本占「暴險總額」（不做風險加權的總資產＋表外項目）比例，防止銀行用風險模型美化風險性資產以規避資本要求。',
+    hi:'帳面槓桿低，資本對總部位的覆蓋較保守。',
+    lo:'槓桿偏高，一旦市場系統性衝擊，損失可能被放大；2021Q1 起才有此項，更早期別無資料。' },
+  debt_equity_ratio: { def:'負債／股東權益（倍數），衡量財務槓桿。銀行本質高槓桿（存款即負債），此倍數通常遠高於一般產業。',
+    hi:'用較少自有資金撬動較大資產規模，ROE 可能較高，但風險緩衝相對薄，宜與資本適足率合看。',
+    lo:'財務結構較保守、抗風險能力強，但資本運用效率可能偏低。' },
+  npl_ratio: { def:'逾期放款（逾期 3 個月以上未繳本息）占放款總額比例，是最直觀的放款品質指標。',
+    hi:'放款品質惡化，可能反映景氣下行、產業／客戶集中曝險或授信寬鬆；業界警戒線 1%。',
+    lo:'放款品質健全；若持續處於極低水位，也可能反映授信策略趨於保守、成長動能受限。' },
+  coverage_ratio: { def:'備抵呆帳（已提列的壞帳準備）占逾期放款的倍數（覆蓋率），衡量已認列的損失準備是否足夠因應目前逾放缺口，業界慣例 ≥100%。',
+    hi:'提列保守、緩衝充裕，即使逾放繼續惡化也有餘裕；數值常見遠超過 100%（如數百%）。',
+    lo:'接近或低於 100% 代表準備覆蓋不足，一旦逾放繼續惡化，恐須加提巨額備抵呆帳，直接侵蝕當期獲利。' },
+  roe_pretax: { def:'稅前淨利占平均股東權益比例（ROE），衡量每一元自有資本創造多少稅前獲利。Q1／Q4 為年化累計數，不可跨季直比。',
+    hi:'對股東資本的運用效率佳，獲利能力強。',
+    lo:'獲利偏弱，或股本（權益）相對規模偏大而未被充分運用。' },
+  roe_adj: { def:'(稅前淨利＋當期提列放款備抵呆帳)/平均權益，把提存的呆帳準備加回稅前淨利後還原 ROE，用以剔除各行提存保守程度不同造成的失真比較。',
+    hi:'還原提存政策後獲利能力仍強；若明顯高於原始 ROE，代表該行當期提列了較多保守準備，真實獲利體質優於帳面數字。',
+    lo:'即使加回提存後獲利仍偏弱，代表本業獲利能力確實不佳，非提存政策造成的假象。' },
+  roa_pretax: { def:'稅前淨利占平均總資產比例（ROA），衡量整體資產運用效率，不受股本槓桿高低影響，適合跨行比較經營本質。',
+    hi:'資產運用效率佳，資產品質與收益率俱優。',
+    lo:'資產閒置或收益率偏低（如存放大量低息資產），資產端獲利能力偏弱。' },
+  roa_adj: { def:'(稅前淨利＋當期提列放款備抵呆帳)/平均資產，同 ROE 還原邏輯的 ROA 版本。',
+    hi:'剔除提存政策差異後，資產運用效率仍佳。',
+    lo:'還原後資產報酬仍偏弱，本業資產運用效率確實不足。' },
+  nim_share: { def:'利息淨收益（存放款利差收入）占稅前淨利的比重，反映獲利結構是否偏重傳統利差業務。此比值在稅前淨利趨近 0 時會劇烈波動，判讀需留意分母異常期別。',
+    hi:'獲利高度依賴存放款利差，一旦利差縮小（如降息環境）獲利衝擊較大。',
+    lo:'手續費、財富管理、投資收益等非利息收入貢獻大，獲利結構較多元，但也可能反映利差業務本身偏弱。' },
+  pretax_margin: { def:'稅前淨利率＝稅前淨利/淨收益，每一元總營業淨收益能轉換成多少稅前淨利，反映成本控制與經營效率。',
+    hi:'費用控制佳、經營槓桿效率高。',
+    lo:'業務費用、呆帳提存等侵蝕獲利較多，轉換效率偏低。' },
+  profit_per_employee: { def:'稅前淨利/員工人數，人均獲利，反映人力生產力與數位化、分行精簡程度。單位為千元/人，非百分比。',
+    hi:'人力精簡或業務規模大帶來高人均產值，常見於外銀子行、純網銀或大型民營行。',
+    lo:'人力密集或分行網絡龐大但單位產出較低，常見於分行眾多的公股行。' },
+  lcr: { def:'流動性覆蓋比率＝高品質流動資產／未來 30 天壓力情境淨現金流出，巴賽爾三大流動性監理指標之一，法定門檻 100%。中國輸出入銀行不適用。',
+    hi:'短期（30 天）極端壓力下的流動性緩衝厚，不易發生擠兌式流動性危機。',
+    lo:'接近或低於 100% 代表短期抗壓能力偏弱，是監理高度關注的重點。' },
+  nsfr: { def:'淨穩定資金比率＝可用穩定資金／所需穩定資金，衡量 1 年期的資金來源與資產運用是否匹配，防止「短借長貸」的期限錯配風險。法定門檻 100%，2018Q1 起才申報。',
+    hi:'長期資金來源（存款、長期借款、資本）相對充足，穩定度高。',
+    lo:'較依賴短期資金支應長期放款／投資，一旦短期資金市場緊縮，容易產生流動性壓力。' },
+  reserve_ratio: { def:'依法須保有的現金、公債等法定流動準備資產占比，法定門檻 10%，是台灣本地最早的流動性監理指標。',
+    hi:'法定流動性緩衝充足。',
+    lo:'接近門檻代表監理關注，也可能反映資金運用較積極（更多資產轉去放款／投資而非流動準備）。' },
+  loan_deposit_ratio: { def:'放款總額占存款總額比例，反映資金運用強度，無法定門檻，業界慣例參考 60%–80% 區間。',
+    hi:'過高（>80%）代表存款大部分已放出去，流動性相對偏緊，若存款流失恐需緊急籌資。',
+    lo:'過低（<60%）代表大量存款閒置未能有效轉化為放款收益，資金運用效率與獲利能力可能偏弱。' },
+  time_deposit_ratio: { def:'定期性存款占總存款比例，反映存款結構穩定度與資金成本，無法定門檻。',
+    hi:'定存（穩定但成本較高）占比高，存款來源穩定但資金成本上升。',
+    lo:'活期存款占比高，資金成本低，但客戶可隨時提領轉出，穩定度相對較差。' },
+  cd_ratio: { def:'銀行可轉讓定存單（NCD，通常為法人大額資金停泊工具）占定期性存款比例，反映定存資金來源結構。',
+    hi:'法人大額資金比重高，這類資金對利率敏感、可能較不穩定，利率一有風吹草動即轉出。',
+    lo:'一般客戶定存為主，相對黏著度較高、較穩定。' },
+  maturity_gap_180d: { def:'180 天內到期的新台幣資產減負債缺口占股東權益比例，衡量短期（半年內）資產負債期限配置。常態即為負值（銀行本質「短借長貸」），不代表異常。',
+    hi:'180 天內到期資產多於負債，短期資金相對寬鬆，但也可能反映短天期資產閒置。',
+    lo:'180 天內到期負債多於資產（常態現象），需關注的是幅度是否明顯超出過去區間或同業甚多，而非正負本身。' },
+  rate_sensitive_ratio: { def:'一年內會隨市場利率重訂價的資產除以負債，100% 為中性（利率變動時資產負債重訂價金額相等，淨利息收入受影響小）。',
+    hi:'>100%（資產敏感）：升息環境下淨利息收入受益，降息環境下則承壓。',
+    lo:'<100%（負債敏感）：降息環境下淨利息收入受益，升息環境下則承壓。偏離 100% 越多，代表利率風險暴露越大。' },
+  rate_sensitive_gap: { def:'利率敏感性資產減負債的缺口占股東權益比例，0 為中性。與上一項意義類似，但用絕對缺口金額而非比率呈現。',
+    hi:'正值：資產面對利率上升較敏感，升息環境下獲利可能受益。',
+    lo:'負值：負債面對利率上升較敏感，升息環境下獲利可能承壓。缺口幅度越大（無論正負）代表利率風險曝險越大。' },
+  deposit_growth: { def:'存款年增率，反映銀行吸收存款（資金來源）的能力與市場信任度，無法定門檻。',
+    hi:'存款基礎快速擴張，通常伴隨分行／數位通路擴展或利率競爭力提升；但過高也可能是短期大額法人資金停泊，須留意結構穩定度。',
+    lo:'存款流失或成長停滯，可能反映客戶轉往其他銀行、貨幣市場基金或投資工具；若伴隨獲利同步下滑需留意。' },
+  loan_growth: { def:'放款年增率，反映授信業務擴張速度與風險偏好，無法定門檻。',
+    hi:'積極擴張放款規模；若未伴隨對應的資產品質監控，過快的放款成長常是未來逾放惡化的領先訊號。',
+    lo:'授信轉趨保守或市場需求疲弱，獲利成長動能可能受限。' },
+  investment_growth: { def:'投資（金融資產）年增率，反映銀行金融投資部位擴張速度，常與資金去化策略相關（存放款需求不足時轉而擴大投資）。',
+    hi:'資金去化策略轉向投資部位；若在升息環境下存續期偏長，可能面臨評價損失風險。',
+    lo:'投資部位收縮，可能反映降低利率風險曝險，或資金轉向放款業務。' },
+  guarantee_growth: { def:'保證業務（如履約保證、押標金保證等表外業務）年增率，屬於收費型業務，不直接占用資產負債表資金，但保證履行時會轉為表內債權。',
+    hi:'手續費型業務擴張，若同時保證對象信用品質下降，則存在潛在信用風險。',
+    lo:'保證業務保守或市場需求疲弱。' },
+};
+function buildExplain(){
+  const box = document.getElementById('explain-list');
+  let html = '', curCat = null;
+  Object.keys(METRICS_DICT).forEach(id => {
+    const m = METRICS_DICT[id];
+    const e = METRIC_EXPLAIN[id];
+    if(!e) return;
+    if(m.category !== curCat){ curCat = m.category;
+      html += `<div class="cat-head">【${curCat}】${CAT_NAME[curCat]}</div>`; }
+    html += `<div class="explain-item">
+      <h3>${m.name}<span class="unit">單位 ${m.unit}</span>${m.threshold != null ? `<span class="th">門檻 ${m.threshold}${m.unit}</span>` : ''}</h3>
+      <div class="def">${e.def}</div>
+      <div class="explain-hl">
+        <div class="hi"><b>數值偏高</b>${e.hi}</div>
+        <div class="lo"><b>數值偏低</b>${e.lo}</div>
+      </div>
+    </div>`;
+  });
+  box.innerHTML = html;
+}
+buildExplain();
+
+// ---------- 指標切換：重繪全部 ----------
+function redrawAll(){
+  updateHeaderNote();
+  drawTrend(); drawRank(); drawBank(); drawGroup(); renderTable(); renderCard();
+}
+metricSel.addEventListener('change', () => { curId = metricSel.value; redrawAll(); });
+redrawAll();
+</script>
+</body>
+</html>
