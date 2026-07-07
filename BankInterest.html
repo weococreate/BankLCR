@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>孳息表儀表板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
+<style>
+  :root{
+    --bg:#f6f7fa; --panel:#ffffff; --panel2:#f3f5f9; --line:#e2e6ee;
+    --ink:#1f2430; --sub:#657081; --accent:#4f46e5;
+    --red:#dc2626; --green:#15803d;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:"Noto Sans TC",-apple-system,"PingFang TC",sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;}
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 20px 60px;}
+  header h1{font-size:22px;letter-spacing:1px;}
+  header .sub{color:var(--sub);font-size:13px;margin-top:4px;}
+  .metric-bar{display:flex;align-items:center;gap:10px;margin:14px 0;flex-wrap:wrap;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;padding:10px 14px;}
+  .metric-bar label{font-size:13px;color:var(--sub);}
+  .metric-note{font-size:12.3px;color:var(--sub);width:100%;margin-top:2px;}
+  .tabs{display:flex;gap:8px;margin:18px 0 14px;flex-wrap:wrap;}
+  .tab{padding:8px 16px;border-radius:999px;border:1px solid var(--line);background:var(--panel);
+    color:var(--sub);cursor:pointer;font-size:13.5px;}
+  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;
+    box-shadow:0 1px 3px rgba(30,41,59,.06);}
+  .panel h2{font-size:15.5px;margin-bottom:4px;}
+  .panel h3{font-size:13px;font-weight:700;color:var(--sub);margin:14px 0 8px;}
+  .panel .hint{color:var(--sub);font-size:12.5px;margin-bottom:12px;}
+  select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:8px;
+    padding:6px 10px;font-size:13.5px;font-family:inherit;}
+  .chart-box{position:relative;height:340px;margin-top:4px;}
+  table{width:100%;border-collapse:collapse;font-size:12.8px;}
+  th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;}
+  th{color:var(--sub);font-weight:600;}
+  th:first-child,td:first-child{text-align:left;}
+  tr:hover td{background:rgba(79,70,229,.05);}
+  .mini-table{margin-bottom:10px;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .mini-table th,.mini-table td{text-align:center;}
+  .note-panel{font-size:12px;color:var(--sub);line-height:1.7;}
+  .note-panel b{color:var(--ink);}
+  .empty{text-align:center;padding:40px 20px;color:#aaa;}
+  section{display:none;} section.show{display:block;}
+  #toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:10px 18px;border-radius:6px;font-size:13px;display:none;z-index:999;max-width:340px}
+  #toast.error{background:#c62828}
+  #toast.show{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>💰 孳息表儀表板</h1>
+  <div class="sub">2015Q4 至今</div>
+</header>
+
+<div class="panel note-panel">
+  <b>說明</b>　未列入授信類（放款、信用卡等）。
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="a">🔍 同行跨期</button>
+  <button class="tab" data-tab="b">🏁 跨行同期</button>
+  <button class="tab" data-tab="c">📈 趨勢</button>
+</div>
+
+<div class="metric-bar">
+  <label for="series-sel">項目：</label>
+  <select id="series-sel">
+    <option value="all">all（債票券＋存拆放）</option>
+    <option value="債票">債票券</option>
+    <option value="存拆">存拆放</option>
+    <option value="RP">附買回</option>
+  </select>
+  <div class="metric-note" id="series-note"></div>
+</div>
+
+<!-- 同行跨期 -->
+<section id="tab-a" class="show">
+  <div class="panel">
+    <h2>同行跨期（同一家銀行跨期比較）</h2>
+    <div class="hint">銀行：<select id="a-bank"></select>　期間：<select id="a-range-from"></select> ～ <select id="a-range-to"></select></div>
+    <div id="a-stats"></div>
+    <h3>餘額（億元）</h3>
+    <div class="chart-box"><canvas id="chart-a-bal"></canvas></div>
+    <h3>利率（%）</h3>
+    <div class="chart-box"><canvas id="chart-a-rate"></canvas></div>
+  </div>
+</section>
+
+<!-- 跨行同期 -->
+<section id="tab-b">
+  <div class="panel">
+    <h2>跨行同期（同一季不同銀行比較）</h2>
+    <div class="hint">期間：<select id="b-period"></select>　（數值已標注於圖上）</div>
+    <h3>餘額（億元）</h3>
+    <div class="chart-box"><canvas id="chart-b-bal"></canvas></div>
+    <h3>利率（%）</h3>
+    <div class="chart-box"><canvas id="chart-b-rate"></canvas></div>
+  </div>
+</section>
+
+<!-- 趨勢 -->
+<section id="tab-c">
+  <div class="panel">
+    <h2>趨勢（跨期＋跨行）</h2>
+    <div class="hint">銀行：<select id="c-bank-filter"></select>　期間：<select id="c-range-from"></select> ～ <select id="c-range-to"></select>　選單一銀行時同時顯示五行平均作對照</div>
+    <h3>餘額（億元）</h3>
+    <div class="chart-box"><canvas id="chart-c-bal"></canvas></div>
+    <h3>利率（%）</h3>
+    <div class="chart-box"><canvas id="chart-c-rate"></canvas></div>
+  </div>
+</section>
+
+</div>
+<div id="toast"></div>
+
+<script>
+const BANKS_FALLBACK = ['中信','兆豐','國泰','富邦','玉山'];
+const PALETTE = {'中信':'36,160,154', '兆豐':'180,90,40', '國泰':'40,100,160', '富邦':'0,83,160', '玉山':'0,101,79'};
+const SERIES_LABEL = {all:'all（債票券＋存拆放）', '債票':'債票券', '存拆':'存拆放', 'RP':'附買回'};
+const ALL_KEY = 'ALL';
+let FB = null; // { quarters, banks, series, data, industry_benchmark, methodology_note }
+let BANKS = BANKS_FALLBACK;
+let curSeries = 'all';
+let charts = {};
+
+function toast(msg, isErr) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = isErr ? 'error show' : 'show';
+  setTimeout(() => el.className = '', 3500);
+}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function drawChart(id, cfg) {
+  if (charts[id]) { charts[id].destroy(); charts[id] = null; }
+  const el = document.getElementById(id);
+  if (!el) return;
+  charts[id] = new Chart(el, cfg);
+}
+function clearChart(id) { if (charts[id]) { charts[id].destroy(); charts[id] = null; } }
+function rateOf(qIdx, bank) {
+  const s = FB.data[curSeries][bank];
+  return s ? s.rate[qIdx] : null;
+}
+function balOf(qIdx, bank) {
+  const s = FB.data[curSeries][bank];
+  return s ? s.balance[qIdx] : null;
+}
+function qIndex(qlabel) { return FB.quarters.indexOf(qlabel); }
+function avgOf(arr) { return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null; }
+
+// 垂直長條圖數值標注（取代另外畫表格）
+const barLabelsV = {id:'barLabelsV', afterDatasetsDraw(chart){
+  const {ctx} = chart;
+  chart.data.datasets.forEach((ds, dsIdx) => {
+    const meta = chart.getDatasetMeta(dsIdx);
+    meta.data.forEach((bar, i) => {
+      const val = ds.data[i]; if (val == null) return;
+      ctx.save();
+      ctx.fillStyle = '#1f2430'; ctx.font = 'bold 11px "Noto Sans TC",-apple-system,sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      const label = ds._labelFmt ? ds._labelFmt(val) : val.toFixed(2);
+      ctx.fillText(label, bar.x, bar.y - 6);
+      ctx.restore();
+    });
+  });
+}};
+
+const TABS = ['a','b','c'];
+let curTab = 'a';
+function switchTab(name) {
+  curTab = name;
+  TABS.forEach(t => document.getElementById('tab-'+t).classList.toggle('show', t===name));
+  document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab===name));
+  renderCurrent();
+}
+document.querySelectorAll('.tab').forEach(el => el.addEventListener('click', () => switchTab(el.dataset.tab)));
+
+function renderCurrent() {
+  if (curTab==='a') runA();
+  if (curTab==='b') runB();
+  if (curTab==='c') runC();
+}
+
+// ── 共用：期間篩選 ──
+function rangeIdx(fromId, toId) {
+  const from = document.getElementById(fromId).value, to = document.getElementById(toId).value;
+  let fromIdx = qIndex(from), toIdx = qIndex(to);
+  if (fromIdx < 0) fromIdx = 0;
+  if (toIdx < 0) toIdx = FB.quarters.length - 1;
+  if (fromIdx > toIdx) { const t = fromIdx; fromIdx = toIdx; toIdx = t; }
+  return [fromIdx, toIdx];
+}
+function statCell(vals, fmt) {
+  const mean = avgOf(vals);
+  const recent4 = avgOf(vals.slice(-4));
+  const prev4 = vals.length >= 8 ? avgOf(vals.slice(-8,-4)) : null;
+  const trend = prev4==null ? '—' : (recent4>prev4 ? `上升（${fmt(recent4)} vs ${fmt(prev4)}）` : recent4<prev4 ? `下降（${fmt(recent4)} vs ${fmt(prev4)}）` : '持平');
+  return { mean: fmt(mean), min: fmt(Math.min(...vals)), max: fmt(Math.max(...vals)), latest: fmt(vals[vals.length-1]), trend };
+}
+const fmtPct = v => v.toFixed(2)+'%';
+const fmtBal = v => Math.round(v).toLocaleString()+' 億元';
+
+// ── 同行跨期 ──
+function runA() {
+  const bank = document.getElementById('a-bank').value;
+  const [fromIdx, toIdx] = rangeIdx('a-range-from', 'a-range-to');
+  const rows = FB.quarters.map((q,i) => ({p:q, i, rate: rateOf(i,bank), bal: balOf(i,bank)}))
+    .filter(r => r.i >= fromIdx && r.i <= toIdx);
+  const rateVals = rows.filter(r => r.rate != null).map(r => r.rate);
+  const balVals = rows.filter(r => r.bal != null).map(r => r.bal);
+  const statsEl = document.getElementById('a-stats');
+  if (!rateVals.length && !balVals.length) {
+    statsEl.innerHTML = '<div class="empty">此行於此期間無資料</div>';
+    clearChart('chart-a-bal'); clearChart('chart-a-rate');
+    return;
+  }
+  const latestP = rows.length ? rows[rows.length-1].p : '';
+  const rateStat = rateVals.length ? statCell(rateVals, fmtPct) : null;
+  const balStat = balVals.length ? statCell(balVals, fmtBal) : null;
+  statsEl.innerHTML = `
+    <table class="mini-table">
+      <thead><tr><th></th><th>均值</th><th>最小值</th><th>最大值</th><th>最新值（${latestP}）</th><th>近4季 vs 前4季</th></tr></thead>
+      <tbody>
+        <tr><td>利率</td>${rateStat ? `<td>${rateStat.mean}</td><td>${rateStat.min}</td><td>${rateStat.max}</td><td>${rateStat.latest}</td><td>${rateStat.trend}</td>` : '<td colspan="5">無資料</td>'}</tr>
+        <tr><td>餘額</td>${balStat ? `<td>${balStat.mean}</td><td>${balStat.min}</td><td>${balStat.max}</td><td>${balStat.latest}</td><td>${balStat.trend}</td>` : '<td colspan="5">無資料</td>'}</tr>
+      </tbody>
+    </table>`;
+  const bc = `rgba(${PALETTE[bank]},.9)`;
+  drawChart('chart-a-bal', {
+    type: 'line',
+    data: { labels: rows.map(r=>r.p),
+      datasets: [{ label: bank+' 餘額(億元)', data: rows.map(r=>r.bal), borderColor: bc, backgroundColor: `rgba(${PALETTE[bank]},.12)`, fill: true, tension: .2 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y).toLocaleString()} 億元` } } } },
+  });
+  drawChart('chart-a-rate', {
+    type: 'line',
+    data: { labels: rows.map(r=>r.p),
+      datasets: [{ label: bank+' 利率(%)', data: rows.map(r=>r.rate), borderColor: bc, backgroundColor: `rgba(${PALETTE[bank]},.12)`, fill: true, tension: .2 }] },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { callback: v => v.toFixed(2)+'%' } } },
+      plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%` } } } },
+  });
+}
+
+// ── 跨行同期 ──
+function runB() {
+  const period = document.getElementById('b-period').value;
+  const i = qIndex(period);
+  const rows = BANKS.map(b => ({b, rate: rateOf(i,b), bal: balOf(i,b)}))
+    .filter(r => r.rate != null).sort((x,y) => y.rate - x.rate);
+  rows.sort((x,y) => (x.b==='中信' ? -1 : y.b==='中信' ? 1 : 0));
+  if (!rows.length) {
+    clearChart('chart-b-bal'); clearChart('chart-b-rate');
+    toast('此期間無資料', true);
+    return;
+  }
+  const balDs = { label: '餘額(億元)', data: rows.map(r=>r.bal), backgroundColor: rows.map(r=>`rgba(${PALETTE[r.b]},.75)`) };
+  balDs._labelFmt = v => Math.round(v).toLocaleString();
+  const rateDs = { label: '利率(%)', data: rows.map(r=>r.rate), backgroundColor: rows.map(r=>`rgba(${PALETTE[r.b]},.75)`) };
+  rateDs._labelFmt = v => v.toFixed(2)+'%';
+  drawChart('chart-b-bal', {
+    type: 'bar',
+    data: { labels: rows.map(r=>r.b), datasets: [balDs] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: ctx => `${Math.round(ctx.parsed.y).toLocaleString()} 億元` } } },
+      scales: { x: { ticks: { font: { weight: 'bold' } } }, y: { grace: '15%' } } },
+    plugins: [barLabelsV],
+  });
+  drawChart('chart-b-rate', {
+    type: 'bar',
+    data: { labels: rows.map(r=>r.b), datasets: [rateDs] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: ctx => `${ctx.parsed.y.toFixed(2)}%` } } },
+      scales: { x: { ticks: { font: { weight: 'bold' } } }, y: { ticks: { callback: v => v.toFixed(2)+'%' }, grace: '15%' } } },
+    plugins: [barLabelsV],
+  });
+}
+
+// ── 趨勢 ──
+function runC() {
+  const sel = document.getElementById('c-bank-filter').value;
+  const showBanks = sel === ALL_KEY ? BANKS : [sel];
+  const [fromIdx, toIdx] = rangeIdx('c-range-from', 'c-range-to');
+  const qRange = FB.quarters.map((q,i)=>({q,i})).filter(x => x.i >= fromIdx && x.i <= toIdx);
+  const rows = qRange.map(({q,i}) => {
+    const rateVals = BANKS.map(b=>rateOf(i,b)).filter(v=>v!=null);
+    const balVals = BANKS.map(b=>balOf(i,b)).filter(v=>v!=null);
+    return { p:q, i, rateAvg: avgOf(rateVals), balAvg: avgOf(balVals) };
+  });
+  const balDatasets = showBanks.map(b => ({ label: b, data: rows.map(r=>balOf(r.i,b)),
+    borderColor: `rgba(${PALETTE[b]},.85)`, fill: false, tension: .15, pointRadius: 2 }));
+  balDatasets.push({ label: '五行平均', data: rows.map(r=>r.balAvg), borderColor: 'rgba(30,30,30,.85)',
+    borderDash: [6,3], borderWidth: sel===ALL_KEY ? 3 : 2, fill: false, pointRadius: 0 });
+  const rateDatasets = showBanks.map(b => ({ label: b, data: rows.map(r=>rateOf(r.i,b)),
+    borderColor: `rgba(${PALETTE[b]},.85)`, fill: false, tension: .15, pointRadius: 2 }));
+  rateDatasets.push({ label: '五行平均', data: rows.map(r=>r.rateAvg), borderColor: 'rgba(30,30,30,.85)',
+    borderDash: [6,3], borderWidth: sel===ALL_KEY ? 3 : 2, fill: false, pointRadius: 0 });
+
+  drawChart('chart-c-bal', {
+    type: 'line',
+    data: { labels: rows.map(r=>r.p), datasets: balDatasets },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${Math.round(ctx.parsed.y).toLocaleString()} 億元` } } } },
+  });
+  drawChart('chart-c-rate', {
+    type: 'line',
+    data: { labels: rows.map(r=>r.p), datasets: rateDatasets },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { callback: v => v.toFixed(2)+'%' } } },
+      plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%` } } } },
+  });
+}
+
+document.getElementById('series-sel').addEventListener('change', (e) => {
+  curSeries = e.target.value;
+  document.getElementById('series-note').textContent = FB.data[curSeries] ? '' : '（此項目資料缺）';
+  renderCurrent();
+});
+document.getElementById('a-bank').addEventListener('change', runA);
+document.getElementById('a-range-from').addEventListener('change', runA);
+document.getElementById('a-range-to').addEventListener('change', runA);
+document.getElementById('b-period').addEventListener('change', runB);
+document.getElementById('c-bank-filter').addEventListener('change', runC);
+document.getElementById('c-range-from').addEventListener('change', runC);
+document.getElementById('c-range-to').addEventListener('change', runC);
+
+async function init() {
+  try {
+    FB = await fetch('/api/BankInterest').then(r => r.json());
+  } catch (e) {
+    toast('資料載入失敗：' + e.message, true);
+    return;
+  }
+  BANKS = FB.banks;
+  document.getElementById('a-bank').innerHTML = BANKS.map(b => `<option>${b}</option>`).join('');
+  document.getElementById('b-period').innerHTML = FB.quarters.slice().reverse().map(p => `<option>${p}</option>`).join('');
+  document.getElementById('c-bank-filter').innerHTML = `<option value="${ALL_KEY}">全選（五行比較）</option>` + BANKS.map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join('');
+  const qOptions = FB.quarters.map(q => `<option>${q}</option>`).join('');
+  const lastIdx = FB.quarters.length - 1;
+  ['a-range-from', 'c-range-from'].forEach(id => { document.getElementById(id).innerHTML = qOptions; document.getElementById(id).selectedIndex = 0; });
+  ['a-range-to', 'c-range-to'].forEach(id => { document.getElementById(id).innerHTML = qOptions; document.getElementById(id).selectedIndex = lastIdx; });
+  runA();
+}
+init();
+</script>
+</body>
+</html>
