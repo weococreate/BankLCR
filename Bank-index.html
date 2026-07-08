@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>銀行儀表板</title>
+<style>
+  :root{
+    --bg:#f6f7fa; --panel:#ffffff; --panel2:#f3f5f9; --line:#e2e6ee;
+    --ink:#1f2430; --sub:#657081; --accent:#4f46e5;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:"Noto Sans TC",-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;}
+  .wrap{max-width:920px;margin:0 auto;padding:48px 20px 60px;}
+  header{margin-bottom:32px;}
+  header h1{font-size:26px;letter-spacing:1px;}
+  header .sub{color:var(--sub);font-size:14px;margin-top:8px;}
+  .section-title{font-size:14px;font-weight:700;color:var(--sub);letter-spacing:1px;margin:32px 0 12px;}
+  .section-title:first-of-type{margin-top:0;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
+  .card{display:block;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;
+    text-decoration:none;color:inherit;transition:border-color .15s,transform .15s,box-shadow .15s;}
+  .card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 20px rgba(79,70,229,.08);}
+  .card .icon{font-size:28px;}
+  .card .name{font-size:17px;font-weight:700;margin:10px 0 6px;}
+  .card .desc{font-size:13px;color:var(--sub);}
+  .card .go{display:inline-block;margin-top:14px;font-size:13px;color:var(--accent);font-weight:600;}
+  footer{margin-top:40px;padding-top:20px;border-top:1px solid var(--line);font-size:12px;color:var(--sub);line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📊 銀行儀表板</h1>
+    <div class="sub">本國銀行財務與流動性指標互動查詢 · 資料源自主管機關與央行公開統計</div>
+  </header>
+
+  <div class="section-title">⚡ 即時資訊</div>
+  <div class="grid">
+    <a class="card" href="https://weococreate.github.io/Bank/GlobalRates.html">
+      <div class="icon">💹</div>
+      <div class="name">利率監控台 GlobalRates</div>
+      <div class="desc">12 幣別央行政策利率、升降息紀錄，美德日公債殖利率曲線與期限利差走勢。</div>
+      <div class="go">進入 →</div>
+    </a>
+  </div>
+
+  <div class="section-title">📊 儀表板</div>
+  <div class="grid">
+    <a class="card" href="https://weococreate.github.io/Bank/BankCAMELS.html">
+      <div class="icon">📈</div>
+      <div class="name">銀行主要財務及營運比率儀表板</div>
+      <div class="desc">資本適足性、資產品質、獲利能力、流動性、利率敏感性、年成長率等 27 項指標，多期跨行比較。</div>
+      <div class="go">進入 →</div>
+    </a>
+
+    <a class="card" href="https://weococreate.github.io/Bank/lcr-compare.html">
+      <div class="icon">💧</div>
+      <div class="name">銀行流動性覆蓋比率 LCR 儀表板</div>
+      <div class="desc">本國銀行流動性覆蓋比率（LCR）逐季跨行比較，走勢、排行、預警一目瞭然。</div>
+      <div class="go">進入 →</div>
+    </a>
+  </div>
+
+  <footer>
+    以上資料皆為各主管機關／央行公開統計整理呈現，僅供參考，不構成投資建議；實際資料請以官方公布為準。
+  </footer>
+</div>
+</body>
+</html>
