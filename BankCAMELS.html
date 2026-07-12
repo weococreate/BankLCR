@@ -343,17 +343,6 @@ function rankGray(v, lo, hi){
   const c = RANK_GRAY_LO.map((c0, i) => Math.round(c0 + (RANK_GRAY_HI[i] - c0) * t));
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
-// 動態離群值偵測：以穩健 MAD（median absolute deviation）判斷是否遠超中位數，
-// 只排除「遠高於中位數、會把長條圖其餘比例壓縮到看不清楚」的極端值，不做方向性判斷（低值不影響長條圖比例，不排除）
-function detectOutliers(rows){
-  const vals = rows.map(r => r.v).sort((a,b)=>a-b);
-  if(vals.length < 5) return new Set();
-  const med = median(vals);
-  const mad = median(vals.map(v => Math.abs(v-med))) || 0;
-  if(mad === 0) return new Set();
-  const cutoff = med + 8 * mad * 1.4826;
-  return new Set(rows.filter(r => r.v > cutoff && r.v > med * 3).map(r => r.n));
-}
 const barLabels = {id:'barLabels', afterDatasetsDraw(chart){
   const {ctx} = chart;
   chart.data.datasets.forEach((ds, dsIdx) => {
@@ -372,11 +361,9 @@ const RANK_LABEL_FONT = '11.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monos
 let rankChart;
 function drawRank(){
   const qi = MD.quarters.indexOf(rankSel.value);
-  let allRows = MD.banks.map(b => ({n:b.n, g:b.g, v:curSeries(b.n)[qi]})).filter(r => r.v != null);
-  const outliers = detectOutliers(allRows);
-  let rows = allRows.filter(r => !outliers.has(r.n));
-  document.getElementById('rank-exclude-note').textContent = outliers.size
-    ? `　（已排除極端離群值以免壓縮比例：${[...outliers].join('、')}）` : '';
+  // 2026-07-12 使用者要求全數保留每一家銀行：不再排除極端離群值（原用 detectOutliers 排除以免壓縮長條比例）
+  let rows = MD.banks.map(b => ({n:b.n, g:b.g, v:curSeries(b.n)[qi]})).filter(r => r.v != null);
+  document.getElementById('rank-exclude-note').textContent = '';
   if(!rows.length){
     document.getElementById('rank-exclude-note').textContent += '　該季本指標無資料。';
     if(rankChart){ rankChart.destroy(); rankChart = null; }
